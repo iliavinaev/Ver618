@@ -1,0 +1,36 @@
+{
+  "name": "skywatch",
+  "private": true,
+  "version": "5.8.0",
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "partykit dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy:server": "partykit deploy"
+  },
+  "dependencies": {
+    "@fontsource/b612": "^5.2.7",
+    "@fontsource/b612-mono": "^5.2.7",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "leaflet": "^1.9.4",
+    "postcss": "^8.4.45",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.10",
+    "vite": "^5.4.6"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "partykit": "^0.0.115",
+    "partysocket": "^1.1.18"
+  }
+}
