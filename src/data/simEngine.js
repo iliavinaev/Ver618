@@ -528,12 +528,14 @@ export function allResolved(sim) { return sim.tracks.every(t => t.done); }
 // ---- Headless full run to completion (for Monte-Carlo / tests) ----
 export function runToEnd(plan, seed, opts) {
   const dt = (opts && opts.dt) || 2;          // sim seconds per step
-  const maxT = (opts && opts.maxT) || 14400;  // 4h sim cap
+  const maxT = (opts && opts.maxT) || 28800;  // 8h sim cap (long Shahed raids need it)
   const sim = initSim(plan, seed);
   let t = 0;
   while (!allResolved(sim) && t < maxT) { stepSim(sim, dt, 0); t += dt; }
-  // force-resolve stragglers as leakers
-  sim.tracks.forEach(tr => { if (!tr.done) { tr.done = true; tr.leakCounted = true; const ts = sim.tgtState[tr.tgtId]; if (ts && !tr.isDecoy) { const dpt = Math.min(tr.dmg || 1, ts.hp); ts.hp -= dpt; ts.hits++; const dv = (ts.valueM / ts.maxHp) * dpt; ts.dmgM += dv; sim.dmgM += dv; } } });
+  // Any track still in flight when the (very long) cap is reached did NOT complete
+  // its mission. It must NOT be counted as a target hit, or the report fabricates
+  // impacts that never happened. Mark it resolved-but-unaccounted (a wash).
+  sim.tracks.forEach(tr => { if (!tr.done) { tr.done = true; tr.unresolved = true; } });
   return summarize(sim);
 }
 
@@ -541,13 +543,18 @@ export function summarize(sim) {
   const total = sim.tracks.length;
   const killed = sim.tracks.filter(t => t.deadCounted).length;
   const leaked = sim.tracks.filter(t => t.leakCounted).length;
+  const unresolved = sim.tracks.filter(t => t.unresolved).length;
   const decoys = sim.tracks.filter(t => t.isDecoy).length;
   const realThreats = total - decoys;
   const realLeaked = sim.tracks.filter(t => !t.isDecoy && t.leakCounted).length;
+  // resolved real threats = those that were either intercepted or leaked (not
+  // still-flying); protection is measured against those, so an over-short run
+  // does not silently inflate the protection rate.
+  const resolvedReal = Math.max(0, realThreats - sim.tracks.filter(t => !t.isDecoy && t.unresolved).length);
   return {
-    total, killed, leaked, decoys, realThreats, realLeaked,
+    total, killed, leaked, unresolved, decoys, realThreats, realLeaked,
     rate: total ? killed / total : 0,
-    protect: realThreats ? 1 - realLeaked / realThreats : 1,
+    protect: resolvedReal ? 1 - realLeaked / resolvedReal : 1,
     spentM: sim.spentM, killedM: sim.killedM, dmgM: sim.dmgM,
     miss: { ...sim.miss },
     tgtState: sim.tgtState, bats: sim.bats,

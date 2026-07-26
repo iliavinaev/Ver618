@@ -278,11 +278,11 @@ const NODE_TYPES = [
   { key:'substn',   name:'Substation',          glyph:'\u26a1', sym:'SUB',  hp:2, value:3, kind:'rear' },
   { key:'comms',    name:'Comms / telecom',     glyph:'\u25c9', sym:'COM',  hp:2, value:3, kind:'rear' },
   { key:'logi',     name:'Logistics depot',     glyph:'\u25ec', sym:'LOG',  hp:3, value:3, kind:'rear' },
-  { key:'airfield', name:'Airfield / FARP',     glyph:'\u25b2', sym:'AF',   hp:3, value:3, kind:'rear' },
+  { key:'airfield', name:'Airfield / FARP',     glyph:'▲', sym:'AF',   hp:3, value:3, kind:'rear' },
   { key:'bridge',   name:'Bridge / MSR',        glyph:'\u25ad', sym:'BRG',  hp:2, value:2, kind:'rear' },
   { key:'water',    name:'Water plant',         glyph:'\u25cc', sym:'H2O',  hp:2, value:3, kind:'rear' },
   { key:'hosp',     name:'Hospital',            glyph:'\u271a', sym:'MED',  hp:2, value:2, kind:'rear' },
-  { key:'fwd',      name:'Forward strongpoint', glyph:'\u25b2', sym:'STP',  hp:3, value:2, kind:'forward' },
+  { key:'fwd',      name:'Forward strongpoint', glyph:'▲', sym:'STP',  hp:3, value:2, kind:'forward' },
 ];
 
 // ===== Real-world map (Leaflet + Esri satellite tiles) =====

@@ -618,14 +618,20 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       if (def.isSensor && def.detectKm > 0) {
         L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#8fd0c4', weight: 1, opacity: 0.7, dashArray: '3,6', fill: true, fillColor: '#8fd0c4', fillOpacity: 0.03 }).addTo(lg);
       }
-      // FIGHTERS: draw the patrol route (violet line + waypoints) and, when a
-      // patrol is set, a faint radar ring so the user sees its search coverage.
-      if (def.isFighter) {
-        if (b.patrol && b.patrol.length >= 2) {
-          L.polyline(b.patrol.map(p => [p.lat, p.lng]), { color: '#c99be0', weight: 1.6, opacity: 0.8, dashArray: '6,4' }).addTo(lg);
-          b.patrol.forEach((p, i) => L.marker([p.lat, p.lng], { interactive: false, icon: L.divIcon({ className: '', iconSize: [8, 8], iconAnchor: [4, 4], html: `<div style="width:6px;height:6px;border:1px solid #c99be0;border-radius:50%;background:rgba(201,155,224,0.3)"></div>` }) }).addTo(lg));
+      // FIGHTERS: draw the patrol route (violet line + waypoints), a patrol ZONE
+      // corridor (the area it covers = route buffered by its A2A reach), and a
+      // faint radar ring so the user sees its search coverage.
+      if (def.isFighter && !def.isSensor) {
+        if (b.patrol && b.patrol.length >= 1) {
+          const reachKm = def.aeroRangeKm || 20;
+          // zone: a translucent buffer circle at each patrol point (union reads as a corridor)
+          b.patrol.forEach(p => L.circle([p.lat, p.lng], { radius: reachKm * 1000, color: '#c99be0', weight: 0, fill: true, fillColor: '#c99be0', fillOpacity: 0.05 }).addTo(lg));
+          if (b.patrol.length >= 2) {
+            L.polyline(b.patrol.map(p => [p.lat, p.lng]), { color: '#c99be0', weight: 1.6, opacity: 0.85, dashArray: '6,4' }).addTo(lg);
+          }
+          b.patrol.forEach((p, i) => L.marker([p.lat, p.lng], { interactive: false, icon: L.divIcon({ className: '', iconSize: [8, 8], iconAnchor: [4, 4], html: `<div style="width:6px;height:6px;border:1px solid #c99be0;border-radius:50%;background:rgba(201,155,224,0.4)"></div>` }) }).addTo(lg));
         }
-        if (def.detectKm > 0) L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#c99be0', weight: 0.8, opacity: 0.35, dashArray: '2,7', fill: false }).addTo(lg);
+        if (def.detectKm > 0) L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#c99be0', weight: 0.8, opacity: 0.3, dashArray: '2,7', fill: false }).addTo(lg);
       }
       // self-defence ring (auto, human out of loop) for big SAMs with it enabled
       const isBigSAM = def.tbmFootprintKm > 0;
@@ -930,8 +936,10 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       // ===== ENGINE: advance the pure simulation (no rendering inside) =====
       stepSim(sim, flightSec, now);
       const tms = sim.simT;
-      // hard cap: ~3h sim-time
-      if (tms > 10800) sim.tracks.forEach(t => { if (!t.done) { t.done = true; t.leakCounted = true; } });
+      // hard cap: ~8h sim-time (long-range Shahed raids can fly 4+ hours; a
+      // track still airborne at the cap did NOT reach its target, so it must not
+      // be scored as a hit, or the report would show impacts that never happened).
+      if (tms > 28800) sim.tracks.forEach(t => { if (!t.done) { t.done = true; t.unresolved = true; } });
       // ===== RENDER: project engine state to the canvas =====
       const kmppNow = kmppRef.current || 1;
       ctx.clearRect(0, 0, cv.width, cv.height);
@@ -951,13 +959,37 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           ctx.strokeStyle = 'rgba(143,208,196,0.10)'; ctx.setLineDash([2, 7]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
         }
         if (b.isFighter) {
-          // small aircraft chevron in violet, plus a faint ammo/dead cue
+          // aircraft marker with a velocity vector: the line points in the
+          // direction of travel and its length scales with real speed, so faster
+          // aircraft visibly show a longer vector. Track last position for heading.
           const dead = b.disabled;
-          ctx.fillStyle = dead ? '#7f93a6' : '#c99be0';
-          ctx.beginPath(); ctx.arc(bp.x, bp.y, 3.5, 0, 7); ctx.fill();
-          ctx.strokeStyle = dead ? '#7f93a6' : '#e3ccf0'; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.arc(bp.x, bp.y, 5.5, 0, 7); ctx.stroke();
-          if (b.ammo <= 0 && !dead) { ctx.fillStyle = '#d9a52f'; ctx.font = '7px monospace'; ctx.fillText('WINCHESTER', bp.x + 7, bp.y + 2); }
+          const prev = b._lastDraw || { lat: b.lat, lng: b.lng };
+          const pv = PX(prev);
+          let hx = bp.x - pv.x, hy = bp.y - pv.y;
+          const hmag = Math.hypot(hx, hy);
+          b._lastDraw = { lat: b.lat, lng: b.lng };
+          // speed vector length in px: scale km/h so ~1000km/h reads as a clear arrow
+          const vLenPx = Math.max(8, Math.min(34, (b.speedKmh || 0) / 1000 * 22));
+          const dirx = hmag > 0.5 ? hx / hmag : 1, diry = hmag > 0.5 ? hy / hmag : 0;
+          const col2 = dead ? '#7f93a6' : '#c99be0';
+          // velocity vector
+          if (!dead) {
+            ctx.strokeStyle = col2; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.9;
+            ctx.beginPath(); ctx.moveTo(bp.x, bp.y); ctx.lineTo(bp.x + dirx * vLenPx, bp.y + diry * vLenPx); ctx.stroke();
+            // arrow head
+            const ax = bp.x + dirx * vLenPx, ay = bp.y + diry * vLenPx;
+            const perpx = -diry, perpy = dirx;
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax - dirx * 4 + perpx * 3, ay - diry * 4 + perpy * 3); ctx.lineTo(ax - dirx * 4 - perpx * 3, ay - diry * 4 - perpy * 3); ctx.closePath(); ctx.fillStyle = col2; ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+          // aircraft body: a small chevron rotated to heading
+          ctx.save(); ctx.translate(bp.x, bp.y); ctx.rotate(Math.atan2(diry, dirx));
+          ctx.fillStyle = dead ? '#7f93a6' : '#e3ccf0'; ctx.strokeStyle = '#0a1626'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, 3.5); ctx.lineTo(-2, 0); ctx.lineTo(-4, -3.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.restore();
+          // speed label
+          if (!dead && b.speedKmh) { ctx.fillStyle = '#c99be0'; ctx.font = '7px monospace'; ctx.fillText(b.speedKmh + ' km/h', bp.x + 8, bp.y - 6); }
+          if (b.ammo <= 0 && !dead) { ctx.fillStyle = '#d9a52f'; ctx.font = '7px monospace'; ctx.fillText('WINCHESTER', bp.x + 8, bp.y + 4); }
         }
       });
       sim.tracks.forEach(tr => {
@@ -1030,15 +1062,18 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       if (b.kills) kills[key] = (kills[key] || 0) + b.kills;
     });
     const total = sim.tracks.length, killed = sim.tracks.filter(t => t.deadCounted).length, leaked = sim.tracks.filter(t => t.leakCounted).length;
+    const unresolved = sim.tracks.filter(t => t.unresolved).length;
     const spentM = sim.spentM || 0, killedM = sim.killedM || 0, dmgM = sim.dmgM || 0;
     const targetStatus = Object.entries(sim.tgtState || {}).map(([id, t]) => ({ id, name: t.name, type: t.type, hp: t.hp, maxHp: t.maxHp, hits: t.hits, dmgM: t.dmgM }));
     const decoys = sim.tracks.filter(t => t.isDecoy).length;
     const realThreats = total - decoys;
     const realLeaked = sim.tracks.filter(t => t.isDecoy === false && t.leakCounted).length;
+    const realUnresolved = sim.tracks.filter(t => t.isDecoy === false && t.unresolved).length;
+    const resolvedReal = Math.max(1, realThreats - realUnresolved);
     setReport({
-      aborted: !!aborted, total, killed, leaked, decoys, realThreats, realLeaked,
+      aborted: !!aborted, total, killed, leaked, unresolved, decoys, realThreats, realLeaked,
       rate: total ? killed / total : 0,
-      protect: realThreats ? 1 - realLeaked / realThreats : 1,
+      protect: 1 - realLeaked / resolvedReal,
       byFam, shots, kills, spendBySys,
       miss: sim.miss || {},
       env: { season: (sim.seasonObj || {}).key, tempC: (sim.seasonObj || {}).tempC, icing: (sim.seasonObj || {}).icing, coldStart: sim.env.coldStart, centralised: sim.env.centralised, jamming: sim.env.jamming, night: sim.env.night },
@@ -1229,7 +1264,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               {placeKind === 'battery' ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') : 'Pick a system below (this switches the map to battery placement).'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
-              {Object.values(allDefs).map(b => (
+              {Object.values(allDefs).filter(b => !b.isFighter && !b.isSensor).map(b => (
                 <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
                   style={{ fontSize: 10, padding: '6px 4px', textAlign: 'left', border: `1px solid ${placeMode === b.id && placeKind === 'battery' ? BLUE : '#243d52'}`, borderRadius: 3, background: placeMode === b.id && placeKind === 'battery' ? 'rgba(47,128,214,0.16)' : 'transparent', color: placeMode === b.id && placeKind === 'battery' ? '#fff' : TEXT, cursor: 'pointer' }}>
                   {b.tag || b.name}<br /><span style={{ color: MUT }}>{b.aeroRangeKm > 0 ? b.aeroRangeKm + 'km' : 'EW'}{b.tbmFootprintKm > 0 ? ' +ABM' : ''}</span>
@@ -1306,7 +1341,61 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="4 · CONDITIONS">
+          <Section title="4 · AIR PATROL & SENSORS">
+            <div className="f-mono" style={{ fontSize: 8, color: '#c99be0', marginBottom: 6, lineHeight: 1.4 }}>
+              Combat air patrol and dedicated sensors are a separate layer. Fighters fly a patrol route you draw and engage cruise / drones inside their air-to-air reach (never ballistic). Sensors (radar, AWACS) only detect and extend the picture. Speeds and ranges are real-world open-source values.
+            </div>
+            <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' && (allDefs[placeMode] || {}).isFighter ? '#c99be0' : (placeKind === 'battery' && (allDefs[placeMode] || {}).isSensor ? '#8fd0c4' : MUT), marginBottom: 5 }}>
+              {placeKind === 'battery' && ((allDefs[placeMode] || {}).isFighter || (allDefs[placeMode] || {}).isSensor) ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name) : 'Pick an aircraft or sensor below, then click the map.'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+              {Object.values(allDefs).filter(b => b.isFighter || b.isSensor).map(b => {
+                const sel = placeMode === b.id && placeKind === 'battery';
+                const isFtr = b.isFighter && !b.isSensor;
+                const accent = b.isSensor ? '#8fd0c4' : '#c99be0';
+                return (
+                  <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
+                    style={{ fontSize: 10, padding: '6px 5px', textAlign: 'left', border: `1px solid ${sel ? accent : '#243d52'}`, borderRadius: 3, background: sel ? (b.isSensor ? 'rgba(143,208,196,0.16)' : 'rgba(201,155,224,0.16)') : 'transparent', color: sel ? '#fff' : TEXT, cursor: 'pointer' }}>
+                    {b.tag || b.name}<br />
+                    <span style={{ color: MUT, fontSize: 8 }}>
+                      {b.speedKmh ? b.speedKmh + ' km/h · ' : ''}{b.isSensor ? 'radar ' + b.detectKm + ' km' : 'A2A ' + b.aeroRangeKm + ' km · ' + b.rounds + ' msl'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {batteries.filter(b => (allDefs[b.type] || {}).isFighter || (allDefs[b.type] || {}).isSensor).length > 0 && (
+              <div style={{ marginTop: 8, border: '1px solid #243d52', borderRadius: 3 }}>
+                <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>AIRBORNE ASSETS · CLICK TO MANAGE / DRAW PATROL</div>
+                {batteries.filter(b => (allDefs[b.type] || {}).isFighter || (allDefs[b.type] || {}).isSensor).map(b => {
+                  const def = allDefs[b.type] || {};
+                  const np = (b.patrol || []).length;
+                  const isFtr = def.isFighter && !def.isSensor;
+                  const drawing = placeKind === 'patrol' && patrolFor === b.uid;
+                  const accent = def.isSensor ? '#8fd0c4' : '#c99be0';
+                  return (
+                    <div key={b.uid} style={{ padding: '5px 6px', borderTop: '1px solid #16293c' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="f-mono" style={{ fontSize: 9, color: accent }}>{def.tag || def.name}</span>
+                        <span className="f-mono" style={{ fontSize: 8, color: MUT }}>{def.speedKmh ? def.speedKmh + ' km/h' : 'static'}{isFtr ? ' · ' + (np > 0 ? np + ' patrol pts' : 'no route') : ''}</span>
+                        <button onClick={() => { setBatteries(prev => prev.filter(x => x.uid !== b.uid)); if (selBat === b.uid) setSelBat(null); if (patrolFor === b.uid) { setPatrolFor(null); setPlaceKind('none'); } }} className="f-mono" style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 7px', border: `1px solid ${RED}`, borderRadius: 3, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>×</button>
+                      </div>
+                      {isFtr && !mapLocked && (
+                        <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+                          <button onClick={() => { if (drawing) { setPlaceKind('none'); setPatrolFor(null); } else { setPatrolFor(b.uid); setPlaceKind('patrol'); } }} className="f-mono" style={{ fontSize: 9, padding: '3px 9px', borderRadius: 3, border: `1px solid ${drawing ? '#c99be0' : '#34516b'}`, background: drawing ? 'rgba(201,155,224,0.2)' : 'transparent', color: drawing ? '#fff' : '#c99be0', cursor: 'pointer' }}>{drawing ? '▶ CLICK MAP TO ADD' : (np > 0 ? 'EDIT PATROL' : 'DRAW PATROL')}</button>
+                          {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: (x.patrol || []).slice(0, -1) } : x))} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: MUT, cursor: 'pointer' }}>UNDO</button>}
+                          {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: [] } : x))} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>CLEAR</button>}
+                        </div>
+                      )}
+                      {isFtr && np === 0 && <div className="f-mono" style={{ fontSize: 8, color: AMBER, marginTop: 4 }}>Needs a patrol route to fly. Press DRAW PATROL.</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          <Section title="5 · CONDITIONS">
             <div className="f-mono" style={{ fontSize: 9, color: MUT, margin: '0 0 2px' }}>SEASON</div>
             <Select value={season} onChange={setSeason} options={Object.values(SEASONS).map(s => [s.key, `${s.label} (${s.tempC > 0 ? '+' : ''}${s.tempC}°C)`])} />
             <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', margin: '3px 0 6px', lineHeight: 1.4 }}>{(SEASONS[season] || {}).notes}</div>
@@ -1818,6 +1907,11 @@ function FinalReport({ report, onClose, onExport }) {
             <Big label="DEFENCE SPEND" v={`$${f.spentM.toFixed(1)}M`} c={BLUE} sub={`$${f.perKillM.toFixed(2)}M per kill`} />
             <Big label="COST EXCHANGE" v={`${f.exchange.toFixed(1)} : 1`} c={f.exchange >= 1 ? GREEN : AMBER} sub="threat value killed vs spend" />
           </div>
+          {report.unresolved > 0 && (
+            <div className="f-mono" style={{ fontSize: 10, color: AMBER, padding: '8px 10px', border: '1px solid rgba(217,165,47,0.5)', borderRadius: 3, marginBottom: 12, lineHeight: 1.5 }}>
+              ⚠ {report.unresolved} threat(s) were still in flight when the run's time limit was reached and are NOT counted as hits or intercepts. This happens with very long-range raids; the simulated flight simply had not finished. Launch from a closer origin, or let the run play longer, for a complete result.
+            </div>
+          )}
 
           <div className="f-mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: '#56a0e0', borderBottom: '1px solid #243d52', paddingBottom: 3, marginBottom: 8 }}>FINANCIAL ASSESSMENT (ILLUSTRATIVE $M)</div>
           <div className="f-mono" style={{ fontSize: 11, color: TEXT, lineHeight: 1.8, marginBottom: 14 }}>
