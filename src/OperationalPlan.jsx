@@ -414,6 +414,26 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         const rid = activeRouteRef.current;
         if (!rid) return; // need an active route first
         const alt = wpAltRef.current;
+        // Ballistic and hypersonic weapons fly a fixed trajectory from launch to
+        // target; the user cannot route them around like a cruise missile. For a
+        // ballistic route we therefore accept only two points: the FIRST click is
+        // the launch point, the trajectory then runs straight to the aim-point.
+        // Further clicks just move the launch point rather than adding zig-zags.
+        const rt = customRoutesRef.current.find(r => r.id === rid);
+        const fam = rt && resolveThreat ? resolveThreat(rt.type).family : null;
+        if (fam === 'ballistic') {
+          setCustomRoutes(prev => prev.map(r => {
+            if (r.id !== rid) return r;
+            const pts = r.points.slice();
+            const launch = { lat: e.latlng.lat, lng: e.latlng.lng, altM: 60000 };
+            // keep an existing impact point (last) if present, else this is launch only
+            if (pts.length >= 2) { pts[0] = launch; }         // move launch, keep impact
+            else if (pts.length === 1) { pts.unshift(launch); } // had impact, add launch before
+            else { pts.push(launch); }                         // first point = launch
+            return { ...r, points: pts };
+          }));
+          return;
+        }
         setCustomRoutes(prev => prev.map(r => r.id === rid
           ? { ...r, points: [...r.points, { lat: e.latlng.lat, lng: e.latlng.lng, altM: alt }] }
           : r));
@@ -431,7 +451,17 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       setBatteries(prev => [...prev, { uid: 'b' + Date.now() + Math.floor(Math.random() * 999), type: placeRef.current, lat: e.latlng.lat, lng: e.latlng.lng, canOverride: seedCan }]);
     });
     map.on('moveend zoomend', recalc);
-    map.on('move zoom', sizeCanvas);
+    map.on('move zoom', () => {
+      sizeCanvas();
+      // While the simulation is playing, the animation loop redraws every frame.
+      // When it is NOT playing (planning or reviewing the report), nothing redraws
+      // the canvas, so a frozen last frame would appear to slide across the map as
+      // the user pans. Clear it so overlays stay anchored to the map instead.
+      if (!playingRef.current) {
+        const cv = canvasRef.current;
+        if (cv) { const ctx = cv.getContext('2d'); if (ctx) ctx.clearRect(0, 0, cv.width, cv.height); }
+      }
+    });
     mapRef.current = map;
     drawDefended();
     const fix = () => { try { map.invalidateSize(); recalc(); } catch (e) {} };
@@ -1522,17 +1552,24 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               {customRoutes.length === 0 && <div className="f-mono" style={{ fontSize: 8, color: MUT }}>No routes yet. Press NEW ROUTE.</div>}
               {customRoutes.map(cr => {
                 const isAct = cr.id === activeRouteId;
+                const rFam = resolveThreat ? resolveThreat(cr.type).family : 'owa';
+                const isBallistic = rFam === 'ballistic';
                 return (
                   <div key={cr.id} style={{ border: `1px solid ${isAct ? '#e8bd55' : '#243d52'}`, borderRadius: 3, padding: 6, marginBottom: 5, background: isAct ? 'rgba(217,165,47,0.08)' : 'transparent' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <button onClick={() => { setActiveRouteId(cr.id); setPlaceKind('route'); }} className="f-mono" style={{ fontSize: 8, padding: '2px 6px', borderRadius: 2, border: `1px solid ${isAct ? '#e8bd55' : '#34516b'}`, background: isAct ? 'rgba(217,165,47,0.2)' : 'transparent', color: isAct ? '#fff' : MUT, cursor: 'pointer' }}>{isAct ? 'DRAWING' : 'SELECT'}</button>
+                      <button onClick={() => { setActiveRouteId(cr.id); setPlaceKind('route'); }} className="f-mono" style={{ fontSize: 8, padding: '2px 6px', borderRadius: 2, border: `1px solid ${isAct ? '#e8bd55' : '#34516b'}`, background: isAct ? 'rgba(217,165,47,0.2)' : 'transparent', color: isAct ? '#fff' : MUT, cursor: 'pointer' }}>{isAct ? (isBallistic ? 'SET LAUNCH' : 'DRAWING') : 'SELECT'}</button>
                       <select value={cr.type} onChange={e => updateRoute(cr.id, { type: e.target.value })} style={{ flex: 1, fontSize: 9, padding: '2px', background: '#0c1c2e', border: '1px solid #34516b', borderRadius: 2, color: '#fff' }}>
                         {threatOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                       </select>
                       <button onClick={() => deleteRoute(cr.id)} className="f-mono" style={{ fontSize: 9, padding: '2px 6px', border: '1px solid #243d52', borderRadius: 2, background: 'transparent', color: RED, cursor: 'pointer' }}>×</button>
                     </div>
+                    {isBallistic && (
+                      <div className="f-mono" style={{ fontSize: 8, color: '#e0726b', marginBottom: 5, lineHeight: 1.4, padding: '4px 6px', border: '1px solid rgba(210,74,68,0.4)', borderRadius: 2, background: 'rgba(210,74,68,0.06)' }}>
+                        ▲ BALLISTIC / HYPERSONIC flies a fixed trajectory. You cannot draw a winding path: set the AIM POINT below and one LAUNCH POINT on the map. The engine flies a direct depressed arc (with Earth-rotation drift) to the target.
+                      </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <span className="f-mono" style={{ fontSize: 8, color: MUT }}>AIMS AT</span>
+                      <span className="f-mono" style={{ fontSize: 8, color: MUT }}>{isBallistic ? 'AIM POINT' : 'AIMS AT'}</span>
                       <select value={cr.target || 'manual'} onChange={e => {
                         const v = e.target.value;
                         if (v === 'manual') { updateRoute(cr.id, { target: 'manual' }); return; }
@@ -1550,7 +1587,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                           }));
                         } else updateRoute(cr.id, { target: v });
                       }} style={{ flex: 1, fontSize: 8, padding: '2px', background: '#0c1c2e', border: '1px solid #34516b', borderRadius: 2, color: '#fff' }}>
-                        <option value="manual">manual (last waypoint = impact)</option>
+                        <option value="manual">{isBallistic ? 'choose a target' : 'manual (last waypoint = impact)'}</option>
                         <optgroup label="Targets">{targets.map(t => <option key={t.id} value={t.id}>{t.id} · {t.name}</option>)}</optgroup>
                         {batteries.length > 0 && <optgroup label="AD sites">{batteries.map(b => { const d = allDefs[b.type] || {}; return <option key={b.uid} value={'bat_' + b.uid}>◎ {d.tag || d.name}</option>; })}</optgroup>}
                       </select>
@@ -1563,27 +1600,44 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                       <span className="f-mono" style={{ fontSize: 8, color: MUT }}>s · H+</span>
                       <input type="number" value={cr.startGH} min={0} max={12} step={0.5} onChange={e => updateRoute(cr.id, { startGH: Math.max(0, +e.target.value || 0) })} style={{ width: 42, fontSize: 9, padding: '2px 4px', background: '#0c1c2e', border: '1px solid #34516b', borderRadius: 2, color: '#fff' }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="f-mono" style={{ fontSize: 8, color: cr.points.length >= 2 ? GREEN : AMBER }}>{cr.points.length} waypoints{cr.points.length < 2 ? ' (need 2+)' : ''}</span>
-                      {cr.points.length > 0 && <button onClick={() => undoWaypoint(cr.id)} className="f-mono" style={{ fontSize: 8, padding: '2px 6px', border: '1px solid #34516b', borderRadius: 2, background: 'transparent', color: MUT, cursor: 'pointer' }}>UNDO LAST</button>}
-                    </div>
-                    {cr.points.length > 0 && (
-                      <div style={{ marginTop: 4, border: '1px solid #1d3346', borderRadius: 2 }}>
-                        <div className="f-mono" style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 0.8fr 16px', gap: 2, fontSize: 7, color: '#5d6b7a', padding: '2px 4px', background: '#0c1c2e' }}>
-                          <span>#</span><span>LAT</span><span>LNG</span><span>ALT m</span><span></span>
-                        </div>
-                        {cr.points.map((p, idx) => (
-                          <div key={idx} className="f-mono" style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 0.8fr 16px', gap: 2, alignItems: 'center', padding: '1px 4px', borderTop: '1px solid #16293c' }}>
-                            <span style={{ fontSize: 7, color: idx === 0 ? GREEN : idx === cr.points.length - 1 ? RED : MUT }}>{idx === 0 ? 'L' : idx === cr.points.length - 1 ? 'I' : idx}</span>
-                            <input type="number" value={+p.lat.toFixed(3)} step={0.01} onChange={e => updateWaypoint(cr.id, idx, { lat: +e.target.value })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
-                            <input type="number" value={+p.lng.toFixed(3)} step={0.01} onChange={e => updateWaypoint(cr.id, idx, { lng: +e.target.value })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
-                            <input type="number" value={p.altM} step={50} min={30} onChange={e => updateWaypoint(cr.id, idx, { altM: Math.max(30, +e.target.value || 30) })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
-                            <button onClick={() => removeWaypoint(cr.id, idx)} style={{ fontSize: 8, padding: 0, background: 'transparent', border: 'none', color: RED, cursor: 'pointer' }}>×</button>
-                          </div>
-                        ))}
+                    {isBallistic ? (
+                      <div className="f-mono" style={{ fontSize: 8, marginTop: 2 }}>
+                        {(() => {
+                          const hasAim = cr.target && cr.target !== 'manual';
+                          const hasLaunch = cr.points.length >= 2;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ color: hasAim ? GREEN : AMBER }}>{hasAim ? '✓ aim point set' : '• choose an aim point above'}</span>
+                              <span style={{ color: hasLaunch ? GREEN : (isAct ? '#e8bd55' : AMBER) }}>{hasLaunch ? '✓ launch point set (' + cr.points[0].lat.toFixed(1) + ', ' + cr.points[0].lng.toFixed(1) + ')' : (isAct ? '▶ now click the map to set the launch point' : '• press SET LAUNCH, then click the map')}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="f-mono" style={{ fontSize: 8, color: cr.points.length >= 2 ? GREEN : AMBER }}>{cr.points.length} waypoints{cr.points.length < 2 ? ' (need 2+)' : ''}</span>
+                          {cr.points.length > 0 && <button onClick={() => undoWaypoint(cr.id)} className="f-mono" style={{ fontSize: 8, padding: '2px 6px', border: '1px solid #34516b', borderRadius: 2, background: 'transparent', color: MUT, cursor: 'pointer' }}>UNDO LAST</button>}
+                        </div>
+                        {cr.points.length > 0 && (
+                          <div style={{ marginTop: 4, border: '1px solid #1d3346', borderRadius: 2 }}>
+                            <div className="f-mono" style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 0.8fr 16px', gap: 2, fontSize: 7, color: '#5d6b7a', padding: '2px 4px', background: '#0c1c2e' }}>
+                              <span>#</span><span>LAT</span><span>LNG</span><span>ALT m</span><span></span>
+                            </div>
+                            {cr.points.map((p, idx) => (
+                              <div key={idx} className="f-mono" style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 0.8fr 16px', gap: 2, alignItems: 'center', padding: '1px 4px', borderTop: '1px solid #16293c' }}>
+                                <span style={{ fontSize: 7, color: idx === 0 ? GREEN : idx === cr.points.length - 1 ? RED : MUT }}>{idx === 0 ? 'L' : idx === cr.points.length - 1 ? 'I' : idx}</span>
+                                <input type="number" value={+p.lat.toFixed(3)} step={0.01} onChange={e => updateWaypoint(cr.id, idx, { lat: +e.target.value })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
+                                <input type="number" value={+p.lng.toFixed(3)} step={0.01} onChange={e => updateWaypoint(cr.id, idx, { lng: +e.target.value })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
+                                <input type="number" value={p.altM} step={50} min={30} onChange={e => updateWaypoint(cr.id, idx, { altM: Math.max(30, +e.target.value || 30) })} style={{ width: '100%', fontSize: 8, padding: '1px 2px', background: '#0a1626', border: '1px solid #243d52', borderRadius: 2, color: '#cdd6e0' }} />
+                                <button onClick={() => removeWaypoint(cr.id, idx)} style={{ fontSize: 8, padding: 0, background: 'transparent', border: 'none', color: RED, cursor: 'pointer' }}>×</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <TypedWaypointAdder onAdd={(lat, lng, alt) => addTypedWaypoint(cr.id, lat, lng, alt)} defaultAlt={wpAltM} />
+                      </>
                     )}
-                    <TypedWaypointAdder onAdd={(lat, lng, alt) => addTypedWaypoint(cr.id, lat, lng, alt)} defaultAlt={wpAltM} />
                   </div>
                 );
               })}
