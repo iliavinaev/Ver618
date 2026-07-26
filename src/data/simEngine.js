@@ -304,9 +304,10 @@ export function stepSim(sim, dtSec, nowMsForReload) {
     }
   });
 
-  // mission-hours proxy for fatigue uses sim time
+  // mission-hours proxy for fatigue uses sim time. Crew fatigue is an optional
+  // effect the planner can switch off (default on); when off, factor stays 1.
   const hoursInto = tms / 3600;
-  const fatigue = fatigueFactor(hoursInto);
+  const fatigue = (sim.env && sim.env.crewFatigue === false) ? 1 : fatigueFactor(hoursInto);
 
   sim.tracks.forEach((tr, _ti) => {
     if (tr.done || tms < tr.spawnT) return;
