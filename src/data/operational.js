@@ -73,6 +73,16 @@ export const BATTERY_REAL = {
   int_team: { id: 'int_team', name: 'Interceptor drone team', tag: 'INT TEAM', nation: 'UA', aeroRangeKm: 15, tbmFootprintKm: 0, detectKm: 20, rounds: 8, reloadS: 20, role: 'C-UAS interceptors', costM: 0.005, can: ['owa','recon','male','tactical'] },
   manpads:  { id: 'manpads',  name: 'MANPADS team',   tag: 'MANPADS', nation: 'UA', aeroRangeKm: 5, tbmFootprintKm: 0, detectKm: 8, rounds: 6, reloadS: 10, role: 'VSHORAD', costM: 0.15, can: ['owa','glide','male','tactical'] },
   ewnode:   { id: 'ewnode',   name: 'EW suite',       nation: 'UA',    aeroRangeKm: 25,  tbmFootprintKm: 0,  detectKm: 35,  rounds: 0,  reloadS: 0,  role: 'EW (soft-kill)', isEW: true, costM: 0, can: ['owa','recon'] },
+  // --- Combat air patrol (moving interceptors) ---
+  // Fighters fly a patrol route and engage cruise / OWA / glide threats inside
+  // their air-to-air missile reach. Airborne, so their radar sees low movers far
+  // better than a ground mast (high effective mast height). rounds = A2A missiles.
+  f16:      { id: 'f16',      name: 'F-16 (AMRAAM CAP)',      tag: 'F-16 CAP',  nation: 'NATO', aeroRangeKm: 40, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 900, mastM: 8000, can: ['cruise','owa','glide','male','recon'] },
+  eurofighter: { id: 'eurofighter', name: 'Eurofighter (Meteor CAP)', tag: 'EF CAP', nation: 'NATO', aeroRangeKm: 80, tbmFootprintKm: 0, detectKm: 160, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.9, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
+  f35:      { id: 'f35',      name: 'F-35 (AMRAAM CAP)',      tag: 'F-35 CAP',  nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter', costM: 1.1, isFighter: true, speedKmh: 950, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  // --- Sensors (detection only, no weapons) ---
+  radar_gbad: { id: 'radar_gbad', name: 'Ground radar (GBAD)', tag: 'RADAR', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 150, rounds: 0, reloadS: 0, role: 'sensor', isSensor: true, mastM: 30, costM: 0.1, can: [] },
+  awacs:    { id: 'awacs',    name: 'AWACS (airborne radar)', tag: 'AWACS', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 400, rounds: 0, reloadS: 0, role: 'sensor (airborne)', isSensor: true, isFighter: true, speedKmh: 700, mastM: 10000, costM: 2.0, can: [] },
 };
 
 // ---- Probability of kill: weapon family x threat family (operational, illustrative) ----
@@ -114,6 +124,13 @@ export const OP_PK = {
   int_team:{ ballistic: 0.0,  cruise: 0.05, owa: 0.68, glide: 0.10 },
   manpads: { ballistic: 0.0,  cruise: 0.10, owa: 0.50, glide: 0.15 },
   ewnode:  { ballistic: 0.0,  cruise: 0.0,  owa: 0.0,  glide: 0.0 },
+  // Fighters with A2A missiles are effective against cruise missiles and drones
+  // but cannot touch ballistic. Meteor (Eurofighter) is the longest-legged shot.
+  f16:         { ballistic: 0.0, cruise: 0.70, owa: 0.62, glide: 0.55, male: 0.65 },
+  eurofighter: { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
+  f35:         { ballistic: 0.0, cruise: 0.75, owa: 0.66, glide: 0.60, male: 0.68 },
+  radar_gbad:  { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
+  awacs:       { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
 };
 
 // ============================================================================

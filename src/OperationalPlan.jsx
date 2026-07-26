@@ -69,11 +69,14 @@ const defaultReactDelay = (type) => {
   if (type === 'iris_t' || type === 'nasams') return 7;
   if (type === 'gepard') return 4;
   if (type === 'manpads' || type === 'int_team') return 5;
+  if (type === 'f16' || type === 'eurofighter' || type === 'f35') return 6; // fighter reaction once cued
   if (/^lib_/.test(type || '')) return 8;
   return 8;
 };
 const batColor = (id) => {
   if (id === 'ewnode') return '#93a1b0';
+  if (id === 'radar_gbad' || id === 'awacs') return '#8fd0c4'; // sensors: teal
+  if (id === 'f16' || id === 'eurofighter' || id === 'f35') return '#c99be0'; // fighters: violet
   if (id === 'patriot' || id === 'samp_t') return BLUE;
   if (id === 'iris_t' || id === 'nasams') return '#56a0e0';
   return '#7bb8d6';
@@ -260,6 +263,8 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const [playing, setPlaying] = useState(false);
   const playingRef = useRef(false); playingRef.current = playing;
   const [selBat, setSelBat] = useState(null); // uid of battery whose control panel is open
+  const [patrolFor, setPatrolFor] = useState(null); // uid of fighter whose patrol is being drawn
+  const patrolForRef = useRef(patrolFor); patrolForRef.current = patrolFor;
   const [liveAmmo, setLiveAmmo] = useState({}); // uid -> ammo, surfaced from sim for the panel
   const liveAmmoRef = useRef({}); liveAmmoRef.current = liveAmmo;
   const [showScenarios, setShowScenarios] = useState(false);
@@ -402,6 +407,12 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     };
     map.on('click', (e) => {
       if (lockRef.current) return;
+      // draw a fighter's patrol route: each click adds a waypoint to that fighter
+      if (placeKindRef.current === 'patrol' && patrolForRef.current) {
+        const uid = patrolForRef.current;
+        setBatteries(prev => prev.map(x => x.uid === uid ? { ...x, patrol: [...(x.patrol || []), { lat: e.latlng.lat, lng: e.latlng.lng }] } : x));
+        return;
+      }
       // set a custom launch point
       if (placeKindRef.current === 'launch') {
         setLaunchPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
@@ -603,6 +614,19 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       }
       if (def.aeroRangeKm > 0) L.circle([b.lat, b.lng], { radius: def.aeroRangeKm * 1000, color: col, weight: 1.2, opacity: ringOpacity, fill: true, fillColor: col, fillOpacity: hidden ? 0.02 : 0.06 }).addTo(lg);
       if (def.tbmFootprintKm > 0) L.circle([b.lat, b.lng], { radius: def.tbmFootprintKm * 1000, color: BLUE, weight: 1, opacity: 0.9, dashArray: '4,4', fill: false }).addTo(lg);
+      // SENSORS (radar / AWACS): draw the detection footprint as a dashed teal ring.
+      if (def.isSensor && def.detectKm > 0) {
+        L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#8fd0c4', weight: 1, opacity: 0.7, dashArray: '3,6', fill: true, fillColor: '#8fd0c4', fillOpacity: 0.03 }).addTo(lg);
+      }
+      // FIGHTERS: draw the patrol route (violet line + waypoints) and, when a
+      // patrol is set, a faint radar ring so the user sees its search coverage.
+      if (def.isFighter) {
+        if (b.patrol && b.patrol.length >= 2) {
+          L.polyline(b.patrol.map(p => [p.lat, p.lng]), { color: '#c99be0', weight: 1.6, opacity: 0.8, dashArray: '6,4' }).addTo(lg);
+          b.patrol.forEach((p, i) => L.marker([p.lat, p.lng], { interactive: false, icon: L.divIcon({ className: '', iconSize: [8, 8], iconAnchor: [4, 4], html: `<div style="width:6px;height:6px;border:1px solid #c99be0;border-radius:50%;background:rgba(201,155,224,0.3)"></div>` }) }).addTo(lg));
+        }
+        if (def.detectKm > 0) L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#c99be0', weight: 0.8, opacity: 0.35, dashArray: '2,7', fill: false }).addTo(lg);
+      }
       // self-defence ring (auto, human out of loop) for big SAMs with it enabled
       const isBigSAM = def.tbmFootprintKm > 0;
       const sdOn = b.selfDefend != null ? b.selfDefend : isBigSAM;
@@ -843,7 +867,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       bounds,
       origins: ORIGIN_BY_ID,
       targets: targets.map(t => ({ id: t.id, lat: t.lat, lng: t.lng, name: t.name, type: t.type, maxHp: t.maxHp, valueM: t.valueM })),
-      batteries: batteries.map(b => ({ uid: b.uid, type: b.type, lat: b.lat, lng: b.lng, engage: b.engage, canOverride: b.canOverride, defOverride: variantOverride(b), launchers: b.launchers || 1, reactDelaySec: b.reactDelaySec != null ? b.reactDelaySec : defaultReactDelay(b.type), c2DelaySec: b.c2DelaySec != null ? b.c2DelaySec : 0, hp: b.hp, selfDefend: b.selfDefend, selfDefendKm: b.selfDefendKm })),
+      batteries: batteries.map(b => ({ uid: b.uid, type: b.type, lat: b.lat, lng: b.lng, engage: b.engage, canOverride: b.canOverride, defOverride: variantOverride(b), launchers: b.launchers || 1, reactDelaySec: b.reactDelaySec != null ? b.reactDelaySec : defaultReactDelay(b.type), c2DelaySec: b.c2DelaySec != null ? b.c2DelaySec : 0, hp: b.hp, selfDefend: b.selfDefend, selfDefendKm: b.selfDefendKm, patrol: b.patrol })),
       waves: [
         ...matrix.map(r => ({ type: r.type, family: r.family, from: r.from, target: r.target || 'all', count: r.count, spacingSec: r.spacingSec, startGH: r.startGH, kmh: r.kmh, terminalKmh: r.terminalKmh, dmg: r.dmg, maneuver: r.maneuver, gLimit: r.gLimit, mirv: r.mirv, mirvSplitKm: r.mirvSplitKm })),
         ...customRoutes.filter(cr => cr.points && cr.points.length >= 2).map(cr => {
@@ -920,6 +944,21 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           ctx.strokeStyle = hidden ? 'rgba(120,130,140,0.06)' : reloading ? 'rgba(217,165,47,0.10)' : 'rgba(86,160,224,0.10)';
           ctx.lineWidth = 1; ctx.stroke();
         }
+        // moving sensors/fighters: draw the search ring and, for fighters, an
+        // aircraft marker at the live position so the patrol is visible in motion.
+        if (b.isSensor && b.def.detectKm > 0) {
+          ctx.beginPath(); ctx.arc(bp.x, bp.y, b.def.detectKm / kmppNow, 0, 7);
+          ctx.strokeStyle = 'rgba(143,208,196,0.10)'; ctx.setLineDash([2, 7]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (b.isFighter) {
+          // small aircraft chevron in violet, plus a faint ammo/dead cue
+          const dead = b.disabled;
+          ctx.fillStyle = dead ? '#7f93a6' : '#c99be0';
+          ctx.beginPath(); ctx.arc(bp.x, bp.y, 3.5, 0, 7); ctx.fill();
+          ctx.strokeStyle = dead ? '#7f93a6' : '#e3ccf0'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(bp.x, bp.y, 5.5, 0, 7); ctx.stroke();
+          if (b.ammo <= 0 && !dead) { ctx.fillStyle = '#d9a52f'; ctx.font = '7px monospace'; ctx.fillText('WINCHESTER', bp.x + 7, bp.y + 2); }
+        }
       });
       sim.tracks.forEach(tr => {
         if (tms < tr.spawnT) return;
@@ -936,7 +975,11 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           return;
         }
         const px = PX(tr.pos);
-        const col = FAM_COL[tr.family] || AMBER;
+        // Track colour by DETECTION: a threat currently held by at least one radar
+        // is shown GREEN (the defender has a firing picture); a threat that no
+        // radar can see is RED (leaking through undetected). Decoys keep grey.
+        const seen = !!tr._detected;
+        const col = tr.isDecoy ? '#7f93a6' : (seen ? GREEN : RED);
         const altA = tr.altKey === 'terrain' ? 0.5 : tr.altKey === 'low' ? 0.6 : 0.72;
         ctx.strokeStyle = col; ctx.lineWidth = tr.family === 'ballistic' ? 2 : 1.4; ctx.globalAlpha = altA;
         ctx.beginPath(); tr.trailGeo.forEach((g, i) => { const p = PX(g); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke();
@@ -1117,7 +1160,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span className="f-display" style={{ fontSize: 20, color: BLUE, letterSpacing: '0.04em' }}>OPERATIONAL PLAN</span>
           <span className="f-mono" style={{ fontSize: 9, padding: '4px 10px', borderRadius: 3, border: `1px solid ${playing ? RED : mapLocked ? AMBER : '#243d52'}`, background: playing ? 'rgba(210,74,68,0.14)' : mapLocked ? 'rgba(217,165,47,0.12)' : 'transparent', color: playing ? '#e0726b' : mapLocked ? AMBER : MUT, letterSpacing: '0.05em' }}>
-            {playing ? '● RUNNING' : mapLocked ? '◆ LOCKED — ready to run' : '✎ PLANNING'}
+            {playing ? '● RUNNING' : mapLocked ? '◆ LOCKED – ready to run' : '✎ PLANNING'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -1178,7 +1221,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                 ))}
               </div>
             )}
-            <div className="f-mono" style={{ fontSize: 9, color: targets.length ? GREEN : AMBER, marginTop: 5 }}>{targets.length ? targets.length + ' target(s) set ✓' : 'No targets yet — place at least one.'}</div>
+            <div className="f-mono" style={{ fontSize: 9, color: targets.length ? GREEN : AMBER, marginTop: 5 }}>{targets.length ? targets.length + ' target(s) set ✓' : 'No targets yet – place at least one.'}</div>
           </Section>
 
           <Section title="3 · DEFENCE BATTERIES (click map)">
@@ -1227,7 +1270,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                           return (
                             <button key={c.key} disabled={!phys}
                               onClick={() => toggleCan(i, b, def, c.key)}
-                              title={phys ? (sel ? 'Allowed — tap to deny' : 'Denied — tap to allow') : 'Not physically capable'}
+                              title={phys ? (sel ? 'Allowed – tap to deny' : 'Denied – tap to allow') : 'Not physically capable'}
                               style={{ fontSize: 7.5, padding: '2px 5px', borderRadius: 3, cursor: phys ? 'pointer' : 'not-allowed',
                                 border: `1px solid ${!phys ? '#1a2c3e' : sel ? c.col : '#34516b'}`,
                                 background: !phys ? 'transparent' : sel ? c.bg : 'transparent',
@@ -1289,13 +1332,15 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, zIndex: 450, pointerEvents: 'none' }} />
           {!mapLocked && (() => {
             const modeInfo = placeKind === 'target'
-              ? { c: AMBER, t: 'PLACING TARGETS — click the map to drop a ' + ((TGT_TYPES[tgtType] || {}).label || 'target') + ' to defend' }
+              ? { c: AMBER, t: 'PLACING TARGETS – click the map to drop a ' + ((TGT_TYPES[tgtType] || {}).label || 'target') + ' to defend' }
               : placeKind === 'battery'
-              ? { c: BLUE, t: 'PLACING BATTERIES — click the map to drop ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') }
+              ? { c: BLUE, t: 'PLACING BATTERIES – click the map to drop ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') }
               : placeKind === 'launch'
-              ? { c: '#e8bd55', t: 'SET LAUNCH POINT — click the map to set a custom origin' }
+              ? { c: '#e8bd55', t: 'SET LAUNCH POINT – click the map to set a custom origin' }
               : placeKind === 'route'
-              ? { c: '#e8bd55', t: 'DRAWING ROUTE — click the map to add waypoints' }
+              ? { c: '#e8bd55', t: 'DRAWING ROUTE – click the map to add waypoints' }
+              : placeKind === 'patrol'
+              ? { c: '#c99be0', t: 'DRAWING PATROL – click the map to add fighter patrol waypoints' }
               : { c: MUT, t: 'Pick what to place from the left panel.' };
             return (
               <div className="f-mono" style={{ position: 'absolute', top: 8, left: 8, zIndex: 500, background: 'rgba(10,22,38,0.92)', border: `1px solid ${modeInfo.c}`, borderRadius: 3, padding: '5px 10px', fontSize: 9, color: modeInfo.c, pointerEvents: 'none', maxWidth: 360 }}>
@@ -1414,6 +1459,24 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                     <button onClick={() => { setBatteries(prev => prev.filter(x => x.uid !== b.uid)); setSelBat(null); }} className="f-mono" style={{ marginLeft: 'auto', fontSize: 9, padding: '4px 9px', border: `1px solid ${RED}`, borderRadius: 3, background: 'rgba(210,74,68,0.12)', color: '#e09a9a', cursor: 'pointer' }}>REMOVE</button>
                   </div>
                 )}
+                {!mapLocked && (allDefs[b.type] || {}).isFighter && (() => {
+                  const drawing = placeKind === 'patrol' && patrolFor === b.uid;
+                  const np = (b.patrol || []).length;
+                  return (
+                    <div style={{ marginTop: 4, marginBottom: 4, padding: '6px 7px', border: `1px solid ${drawing ? '#c99be0' : '#243d52'}`, borderRadius: 3, background: drawing ? 'rgba(201,155,224,0.08)' : '#0a1626' }}>
+                      <div className="f-mono" style={{ fontSize: 9, color: '#c99be0', marginBottom: 4 }}>PATROL ROUTE {np > 0 ? `(${np} point${np === 1 ? '' : 's'})` : '(none)'}</div>
+                      <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 5, lineHeight: 1.4 }}>
+                        {np === 0 ? 'This aircraft needs a patrol route. Press DRAW, then click the map to add waypoints (2+ makes a racetrack it flies back and forth).' : (np === 1 ? 'One point = it loiters there. Add more for a racetrack.' : 'It flies leg to leg and reverses at the ends.')}
+                      </div>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        <button onClick={() => { if (drawing) { setPlaceKind('none'); setPatrolFor(null); } else { setPatrolFor(b.uid); setPlaceKind('patrol'); } }} className="f-mono" style={{ fontSize: 9, padding: '4px 10px', borderRadius: 3, border: `1px solid ${drawing ? '#c99be0' : '#34516b'}`, background: drawing ? 'rgba(201,155,224,0.2)' : 'transparent', color: drawing ? '#fff' : '#c99be0', cursor: 'pointer' }}>{drawing ? '▶ CLICK MAP TO ADD' : 'DRAW PATROL'}</button>
+                        {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: (x.patrol || []).slice(0, -1) } : x))} className="f-mono" style={{ fontSize: 9, padding: '4px 9px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: MUT, cursor: 'pointer' }}>UNDO LAST</button>}
+                        {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: [] } : x))} className="f-mono" style={{ fontSize: 9, padding: '4px 9px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>CLEAR</button>}
+                      </div>
+                      <div className="f-mono" style={{ fontSize: 8, color: MUT, marginTop: 5 }}>Air-to-air reach {def.aeroRangeKm} km · radar {def.detectKm} km · {def.rounds} missiles · engages cruise / drones, not ballistic.</div>
+                    </div>
+                  );
+                })()}
                 {!mapLocked && (() => {
                   const isBig = (allDefs[b.type] || {}).tbmFootprintKm > 0;
                   const sd = b.selfDefend != null ? b.selfDefend : isBig;

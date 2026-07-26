@@ -140,6 +140,12 @@ export function initSim(plan, seed) {
       selfDefend: b.selfDefend != null ? b.selfDefend : (def.tbmFootprintKm > 0),
       selfDefendKm: b.selfDefendKm != null ? b.selfDefendKm : (def.tbmFootprintKm > 0 ? 20 : 0),
       shots: 0, kills: 0, costM: def.costM || 0,
+      // sensors detect but never fire; fighters/AWACS fly a patrol loop.
+      isSensor: !!def.isSensor,
+      isFighter: !!def.isFighter,
+      speedKmh: def.speedKmh || 0,
+      patrol: (b.patrol && b.patrol.length >= 1) ? b.patrol.map(p => ({ lat: p.lat, lng: p.lng })) : null,
+      patLeg: 0, patDir: 1, // current leg index and direction along the patrol loop
     };
   });
   // coverage points the cruise router tries to skirt (live SAM/gun rings)
@@ -271,6 +277,32 @@ export function stepSim(sim, dtSec, nowMsForReload) {
 
   // complete reloads (real-time gated by the caller's clock)
   sim.bats.forEach(b => { if (b.reloadUntil && now >= b.reloadUntil) { b.ammo = b.maxAmmo; b.reloadUntil = 0; } });
+
+  // move fighters / AWACS along their patrol loop. A patrol with one point is a
+  // loiter (stationary); with 2+ points the aircraft flies leg to leg and, at the
+  // end, reverses direction (a racetrack back-and-forth). Position updates feed
+  // both its radar coverage and its air-to-air engagement zone.
+  sim.bats.forEach(b => {
+    if (!b.isFighter || !b.patrol || b.disabled) return;
+    if (b.patrol.length < 2 || !b.speedKmh) { // single-point loiter: sit on it
+      if (b.patrol.length >= 1) { b.lat = b.patrol[0].lat; b.lng = b.patrol[0].lng; }
+      return;
+    }
+    let stepKm = (b.speedKmh / 3600) * dtSec;
+    // advance along legs, consuming stepKm, bouncing at the ends of the route
+    let guard = 0;
+    while (stepKm > 0 && guard++ < 50) {
+      const nextIdx = b.patLeg + b.patDir;
+      const wp = b.patrol[nextIdx];
+      if (!wp) { b.patDir *= -1; continue; } // hit an end: reverse
+      const d = kmBetween(b, wp);
+      if (d <= stepKm) { b.lat = wp.lat; b.lng = wp.lng; b.patLeg = nextIdx; stepKm -= d; }
+      else {
+        const f = stepKm / d;
+        b.lat += (wp.lat - b.lat) * f; b.lng += (wp.lng - b.lng) * f; stepKm = 0;
+      }
+    }
+  });
 
   // mission-hours proxy for fatigue uses sim time
   const hoursInto = tms / 3600;
@@ -421,7 +453,7 @@ export function stepSim(sim, dtSec, nowMsForReload) {
     if (detected) { tr.everDetected = true; }
 
     for (let bi = 0; bi < sim.bats.length; bi++) {
-      const b = sim.bats[bi]; if (b.isEW) continue;
+      const b = sim.bats[bi]; if (b.isEW || b.isSensor) continue; // sensors detect only
       if (b.disabled) continue; // destroyed site cannot fire
       if (!b.engage) continue;
       if (!detected) continue; // cannot shoot what no radar sees

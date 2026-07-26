@@ -2839,7 +2839,7 @@ function AppInner() {
 }
 
 // ============================================================================
-// ACCESS GATE — server-verified shared code. The App only renders once a valid
+// ACCESS GATE – server-verified shared code. The App only renders once a valid
 // session token is held. The token is checked against /api/auth (which holds the
 // real code in a server env var), so the code is never present in this bundle.
 // ============================================================================
@@ -3472,7 +3472,9 @@ function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, audioOn, setAu
               <strong>SHORAD, GUNS &amp; MANPADS:</strong><br/>
               Gepard · Skynex · Stinger · Piorun<br/><br/>
               <strong style={{ color: '#2f80d6' }}>C-UAS &amp; EW:</strong><br/>
-              Mobile fire groups · drone-interceptor crews · EW suite
+              Mobile fire groups · drone-interceptor crews · EW suite<br/><br/>
+              <strong style={{ color: '#c99be0' }}>COMBAT AIR PATROL &amp; SENSORS:</strong><br/>
+              F-16 · Eurofighter · F-35 (A2A) · ground radar · AWACS
             </p>
             <p className="f-serif text-[12px] mt-3" style={{ color: '#d24a44' }}>
               <strong>The core dilemma:</strong> few interceptors, many threats, decoys baiting your missiles. Conserve rounds for the ballistic window while protecting what matters.
