@@ -263,6 +263,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const [playing, setPlaying] = useState(false);
   const playingRef = useRef(false); playingRef.current = playing;
   const [selBat, setSelBat] = useState(null); // uid of battery whose control panel is open
+  const [libCat, setLibCat] = useState('SAM'); // which library category is shown in the AD picker
   const [patrolFor, setPatrolFor] = useState(null); // uid of fighter whose patrol is being drawn
   const patrolForRef = useRef(patrolFor); patrolForRef.current = patrolFor;
   const [liveAmmo, setLiveAmmo] = useState({}); // uid -> ammo, surfaced from sim for the panel
@@ -618,20 +619,19 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       if (def.isSensor && def.detectKm > 0) {
         L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#8fd0c4', weight: 1, opacity: 0.7, dashArray: '3,6', fill: true, fillColor: '#8fd0c4', fillOpacity: 0.03 }).addTo(lg);
       }
-      // FIGHTERS: draw the patrol route (violet line + waypoints), a patrol ZONE
-      // corridor (the area it covers = route buffered by its A2A reach), and a
-      // faint radar ring so the user sees its search coverage.
+      // FIGHTERS: draw ONLY the patrol route (clean violet line + waypoints). The
+      // engagement radius is not a static blob here; it follows the aircraft in
+      // flight (drawn on the canvas during the run), so planning stays readable.
       if (def.isFighter && !def.isSensor) {
-        if (b.patrol && b.patrol.length >= 1) {
-          const reachKm = def.aeroRangeKm || 20;
-          // zone: a translucent buffer circle at each patrol point (union reads as a corridor)
-          b.patrol.forEach(p => L.circle([p.lat, p.lng], { radius: reachKm * 1000, color: '#c99be0', weight: 0, fill: true, fillColor: '#c99be0', fillOpacity: 0.05 }).addTo(lg));
-          if (b.patrol.length >= 2) {
-            L.polyline(b.patrol.map(p => [p.lat, p.lng]), { color: '#c99be0', weight: 1.6, opacity: 0.85, dashArray: '6,4' }).addTo(lg);
-          }
-          b.patrol.forEach((p, i) => L.marker([p.lat, p.lng], { interactive: false, icon: L.divIcon({ className: '', iconSize: [8, 8], iconAnchor: [4, 4], html: `<div style="width:6px;height:6px;border:1px solid #c99be0;border-radius:50%;background:rgba(201,155,224,0.4)"></div>` }) }).addTo(lg));
+        if (b.patrol && b.patrol.length >= 2) {
+          L.polyline(b.patrol.map(p => [p.lat, p.lng]), { color: '#c99be0', weight: 1.8, opacity: 0.9, dashArray: '7,5' }).addTo(lg);
         }
-        if (def.detectKm > 0) L.circle([b.lat, b.lng], { radius: def.detectKm * 1000, color: '#c99be0', weight: 0.8, opacity: 0.3, dashArray: '2,7', fill: false }).addTo(lg);
+        if (b.patrol && b.patrol.length >= 1) {
+          b.patrol.forEach((p, i) => L.marker([p.lat, p.lng], { interactive: false, icon: L.divIcon({ className: '', iconSize: [10, 10], iconAnchor: [5, 5], html: `<div style="width:7px;height:7px;border:1.5px solid #c99be0;border-radius:50%;background:rgba(201,155,224,0.5)"></div>` }) }).addTo(lg));
+        }
+        // one small A2A reach ring at the aircraft's current (start) position, so
+        // the user sees how far it can shoot; it will move with the jet in the run.
+        if (def.aeroRangeKm > 0) L.circle([b.lat, b.lng], { radius: def.aeroRangeKm * 1000, color: '#c99be0', weight: 1, opacity: 0.5, dashArray: '3,5', fill: true, fillColor: '#c99be0', fillOpacity: 0.04 }).addTo(lg);
       }
       // self-defence ring (auto, human out of loop) for big SAMs with it enabled
       const isBigSAM = def.tbmFootprintKm > 0;
@@ -949,8 +949,14 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         const hidden = b.engage === false;
         if (b.def.aeroRangeKm > 0) {
           ctx.beginPath(); ctx.arc(bp.x, bp.y, b.def.aeroRangeKm / kmppNow, 0, 7);
-          ctx.strokeStyle = hidden ? 'rgba(120,130,140,0.06)' : reloading ? 'rgba(217,165,47,0.10)' : 'rgba(86,160,224,0.10)';
-          ctx.lineWidth = 1; ctx.stroke();
+          if (b.isFighter) {
+            // fighter A2A engagement ring follows the jet as it flies
+            ctx.strokeStyle = b.disabled ? 'rgba(127,147,166,0.12)' : (b.ammo <= 0 ? 'rgba(217,165,47,0.16)' : 'rgba(201,155,224,0.22)');
+            ctx.setLineDash([4, 5]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+          } else {
+            ctx.strokeStyle = hidden ? 'rgba(120,130,140,0.06)' : reloading ? 'rgba(217,165,47,0.10)' : 'rgba(86,160,224,0.10)';
+            ctx.lineWidth = 1; ctx.stroke();
+          }
         }
         // moving sensors/fighters: draw the search ring and, for fighters, an
         // aircraft marker at the live position so the patrol is visible in motion.
@@ -1259,26 +1265,42 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             <div className="f-mono" style={{ fontSize: 9, color: targets.length ? GREEN : AMBER, marginTop: 5 }}>{targets.length ? targets.length + ' target(s) set ✓' : 'No targets yet – place at least one.'}</div>
           </Section>
 
-          <Section title="3 · DEFENCE BATTERIES (click map)">
+          <Section title="3 · AIR DEFENCE – SAM / GUNS / C-UAS (ППО)">
             <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' ? GREEN : MUT, marginBottom: 5 }}>
-              {placeKind === 'battery' ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') : 'Pick a system below (this switches the map to battery placement).'}
+              {placeKind === 'battery' ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') : 'Pick a system, then click the map. Fighters, radars and EW are in their own sections below.'}
             </div>
+            <div className="f-mono" style={{ fontSize: 8, color: '#56a0e0', marginBottom: 3 }}>QUICK SYSTEMS</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
-              {Object.values(allDefs).filter(b => !b.isFighter && !b.isSensor).map(b => (
+              {Object.values(allDefs).filter(b => !b.isFighter && !b.isSensor && !b.isEW && !/^lib_/.test(b.id)).map(b => (
                 <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
                   style={{ fontSize: 10, padding: '6px 4px', textAlign: 'left', border: `1px solid ${placeMode === b.id && placeKind === 'battery' ? BLUE : '#243d52'}`, borderRadius: 3, background: placeMode === b.id && placeKind === 'battery' ? 'rgba(47,128,214,0.16)' : 'transparent', color: placeMode === b.id && placeKind === 'battery' ? '#fff' : TEXT, cursor: 'pointer' }}>
                   {b.tag || b.name}<br /><span style={{ color: MUT }}>{b.aeroRangeKm > 0 ? b.aeroRangeKm + 'km' : 'EW'}{b.tbmFootprintKm > 0 ? ' +ABM' : ''}</span>
                 </button>
               ))}
             </div>
-            <div className="f-mono" style={{ fontSize: 9, color: '#56a0e0', margin: '8px 0 3px' }}>ADD FROM DEFENCE LIBRARY ({libOptions.length})</div>
-            <select disabled={mapLocked} className="f-mono" defaultValue=""
-              onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
-              style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3 }}>
-              <option value="" disabled>Pick a system…</option>
-              {libOptions.map(e => <option key={e.idx} value={e.idx}>{e.cat} · {e.name} ({e.country}) · {e.rangeKm}km</option>)}
-            </select>
-            <div className="f-mono" style={{ fontSize: 9, color: MUT, marginTop: 6 }}>{batteries.length} placed. Click a battery to remove (when unlocked). Library systems get a derived operational profile.</div>
+            {(() => {
+              const adCats = [{ key: 'SAM', label: 'SAM' }, { key: 'MANPADS', label: 'MANPADS' }, { key: 'GUN_LASER', label: 'Guns/Laser' }, { key: 'INTERCEPTOR', label: 'Interceptors' }];
+              const inCat = libOptions.filter(e => e.cat === libCat);
+              return (
+                <div style={{ marginTop: 8, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+                  <div className="f-mono" style={{ fontSize: 9, color: '#56a0e0', marginBottom: 3 }}>FULL LIBRARY BY CATEGORY</div>
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+                    {adCats.map(c => {
+                      const n = libOptions.filter(e => e.cat === c.key).length;
+                      const on = libCat === c.key;
+                      return <button key={c.key} onClick={() => setLibCat(c.key)} className="f-mono" style={{ fontSize: 8, padding: '3px 7px', borderRadius: 3, border: `1px solid ${on ? BLUE : '#243d52'}`, background: on ? 'rgba(47,128,214,0.16)' : 'transparent', color: on ? '#fff' : MUT, cursor: 'pointer' }}>{c.label} ({n})</button>;
+                    })}
+                  </div>
+                  <select disabled={mapLocked} className="f-mono" value=""
+                    onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
+                    style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3 }}>
+                    <option value="" disabled>Pick a {libCat} system… ({inCat.length})</option>
+                    {inCat.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km</option>)}
+                  </select>
+                </div>
+              );
+            })()}
+            <div className="f-mono" style={{ fontSize: 9, color: MUT, marginTop: 6 }}>{batteries.filter(b => { const d = allDefs[b.type] || {}; return !d.isFighter && !d.isSensor && !d.isEW; }).length} AD systems placed. Library systems get a derived operational profile.</div>
             {batteries.length > 0 && (
               <div style={{ marginTop: 8, border: '1px solid #243d52', borderRadius: 3 }}>
                 <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>
@@ -1286,6 +1308,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                 </div>
                 {batteries.map((b, i) => {
                   const def = allDefs[b.type] || {};
+                  if (def.isFighter || def.isSensor || def.isEW) return null; // shown in their own sections
                   const allowed = effectiveCan(b, def);
                   const on = b.engage !== false;
                   return (
@@ -1341,53 +1364,46 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="4 · AIR PATROL & SENSORS">
+          <Section title="4 · AIR PATROL – FIGHTERS (авіація)">
             <div className="f-mono" style={{ fontSize: 8, color: '#c99be0', marginBottom: 6, lineHeight: 1.4 }}>
-              Combat air patrol and dedicated sensors are a separate layer. Fighters fly a patrol route you draw and engage cruise / drones inside their air-to-air reach (never ballistic). Sensors (radar, AWACS) only detect and extend the picture. Speeds and ranges are real-world open-source values.
+              Combat air patrol. Fighters fly a patrol route you draw and engage cruise missiles and drones inside their air-to-air reach (never ballistic). When a fighter detects a threat it turns to intercept; its engagement radius travels with it. Speeds and ranges are real-world open-source values.
             </div>
-            <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' && (allDefs[placeMode] || {}).isFighter ? '#c99be0' : (placeKind === 'battery' && (allDefs[placeMode] || {}).isSensor ? '#8fd0c4' : MUT), marginBottom: 5 }}>
-              {placeKind === 'battery' && ((allDefs[placeMode] || {}).isFighter || (allDefs[placeMode] || {}).isSensor) ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name) : 'Pick an aircraft or sensor below, then click the map.'}
+            <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' && (allDefs[placeMode] || {}).isFighter && !(allDefs[placeMode] || {}).isSensor ? '#c99be0' : MUT, marginBottom: 5 }}>
+              {placeKind === 'battery' && (allDefs[placeMode] || {}).isFighter && !(allDefs[placeMode] || {}).isSensor ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name) + ', then draw its patrol' : 'Pick a fighter below, place it, then draw its patrol route.'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
-              {Object.values(allDefs).filter(b => b.isFighter || b.isSensor).map(b => {
+              {Object.values(allDefs).filter(b => b.isFighter && !b.isSensor).map(b => {
                 const sel = placeMode === b.id && placeKind === 'battery';
-                const isFtr = b.isFighter && !b.isSensor;
-                const accent = b.isSensor ? '#8fd0c4' : '#c99be0';
                 return (
                   <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
-                    style={{ fontSize: 10, padding: '6px 5px', textAlign: 'left', border: `1px solid ${sel ? accent : '#243d52'}`, borderRadius: 3, background: sel ? (b.isSensor ? 'rgba(143,208,196,0.16)' : 'rgba(201,155,224,0.16)') : 'transparent', color: sel ? '#fff' : TEXT, cursor: 'pointer' }}>
-                    {b.tag || b.name}<br />
-                    <span style={{ color: MUT, fontSize: 8 }}>
-                      {b.speedKmh ? b.speedKmh + ' km/h · ' : ''}{b.isSensor ? 'radar ' + b.detectKm + ' km' : 'A2A ' + b.aeroRangeKm + ' km · ' + b.rounds + ' msl'}
-                    </span>
+                    style={{ fontSize: 10, padding: '6px 5px', textAlign: 'left', border: `1px solid ${sel ? '#c99be0' : '#243d52'}`, borderRadius: 3, background: sel ? 'rgba(201,155,224,0.16)' : 'transparent', color: sel ? '#fff' : TEXT, cursor: 'pointer' }}>
+                    {b.tag || b.name}<br /><span style={{ color: MUT, fontSize: 8 }}>{b.speedKmh} km/h · A2A {b.aeroRangeKm} km · {b.rounds} msl</span>
                   </button>
                 );
               })}
             </div>
-            {batteries.filter(b => (allDefs[b.type] || {}).isFighter || (allDefs[b.type] || {}).isSensor).length > 0 && (
+            {batteries.filter(b => { const d = allDefs[b.type] || {}; return d.isFighter && !d.isSensor; }).length > 0 && (
               <div style={{ marginTop: 8, border: '1px solid #243d52', borderRadius: 3 }}>
-                <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>AIRBORNE ASSETS · CLICK TO MANAGE / DRAW PATROL</div>
-                {batteries.filter(b => (allDefs[b.type] || {}).isFighter || (allDefs[b.type] || {}).isSensor).map(b => {
+                <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>FIGHTERS · DRAW EACH ONE A PATROL</div>
+                {batteries.filter(b => { const d = allDefs[b.type] || {}; return d.isFighter && !d.isSensor; }).map(b => {
                   const def = allDefs[b.type] || {};
                   const np = (b.patrol || []).length;
-                  const isFtr = def.isFighter && !def.isSensor;
                   const drawing = placeKind === 'patrol' && patrolFor === b.uid;
-                  const accent = def.isSensor ? '#8fd0c4' : '#c99be0';
                   return (
                     <div key={b.uid} style={{ padding: '5px 6px', borderTop: '1px solid #16293c' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="f-mono" style={{ fontSize: 9, color: accent }}>{def.tag || def.name}</span>
-                        <span className="f-mono" style={{ fontSize: 8, color: MUT }}>{def.speedKmh ? def.speedKmh + ' km/h' : 'static'}{isFtr ? ' · ' + (np > 0 ? np + ' patrol pts' : 'no route') : ''}</span>
+                        <span className="f-mono" style={{ fontSize: 9, color: '#c99be0' }}>{def.tag || def.name}</span>
+                        <span className="f-mono" style={{ fontSize: 8, color: MUT }}>{def.speedKmh} km/h · {np > 0 ? np + ' patrol pts' : 'no route'}</span>
                         <button onClick={() => { setBatteries(prev => prev.filter(x => x.uid !== b.uid)); if (selBat === b.uid) setSelBat(null); if (patrolFor === b.uid) { setPatrolFor(null); setPlaceKind('none'); } }} className="f-mono" style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 7px', border: `1px solid ${RED}`, borderRadius: 3, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>×</button>
                       </div>
-                      {isFtr && !mapLocked && (
+                      {!mapLocked && (
                         <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
                           <button onClick={() => { if (drawing) { setPlaceKind('none'); setPatrolFor(null); } else { setPatrolFor(b.uid); setPlaceKind('patrol'); } }} className="f-mono" style={{ fontSize: 9, padding: '3px 9px', borderRadius: 3, border: `1px solid ${drawing ? '#c99be0' : '#34516b'}`, background: drawing ? 'rgba(201,155,224,0.2)' : 'transparent', color: drawing ? '#fff' : '#c99be0', cursor: 'pointer' }}>{drawing ? '▶ CLICK MAP TO ADD' : (np > 0 ? 'EDIT PATROL' : 'DRAW PATROL')}</button>
                           {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: (x.patrol || []).slice(0, -1) } : x))} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: MUT, cursor: 'pointer' }}>UNDO</button>}
                           {np > 0 && <button onClick={() => setBatteries(prev => prev.map(x => x.uid === b.uid ? { ...x, patrol: [] } : x))} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>CLEAR</button>}
                         </div>
                       )}
-                      {isFtr && np === 0 && <div className="f-mono" style={{ fontSize: 8, color: AMBER, marginTop: 4 }}>Needs a patrol route to fly. Press DRAW PATROL.</div>}
+                      {np === 0 && <div className="f-mono" style={{ fontSize: 8, color: AMBER, marginTop: 4 }}>Needs a patrol route to fly. Press DRAW PATROL.</div>}
                     </div>
                   );
                 })}
@@ -1395,7 +1411,92 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="5 · CONDITIONS">
+          <Section title="5 · RADARS & AWACS (радари)">
+            <div className="f-mono" style={{ fontSize: 8, color: '#8fd0c4', marginBottom: 6, lineHeight: 1.4 }}>
+              Dedicated sensors detect threats but never fire. They extend the picture so more threats show GREEN (seen) instead of RED (leaking through unseen). AWACS is airborne and sees low movers far out.
+            </div>
+            <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' && (allDefs[placeMode] || {}).isSensor ? '#8fd0c4' : MUT, marginBottom: 5 }}>
+              {placeKind === 'battery' && (allDefs[placeMode] || {}).isSensor ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name) : 'Pick a sensor below, then click the map.'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+              {Object.values(allDefs).filter(b => b.isSensor).map(b => {
+                const sel = placeMode === b.id && placeKind === 'battery';
+                return (
+                  <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
+                    style={{ fontSize: 10, padding: '6px 5px', textAlign: 'left', border: `1px solid ${sel ? '#8fd0c4' : '#243d52'}`, borderRadius: 3, background: sel ? 'rgba(143,208,196,0.16)' : 'transparent', color: sel ? '#fff' : TEXT, cursor: 'pointer' }}>
+                    {b.tag || b.name}<br /><span style={{ color: MUT, fontSize: 8 }}>radar {b.detectKm} km{b.speedKmh ? ' · ' + b.speedKmh + ' km/h' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {batteries.filter(b => (allDefs[b.type] || {}).isSensor).length > 0 && (
+              <div style={{ marginTop: 8, border: '1px solid #243d52', borderRadius: 3 }}>
+                <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>SENSORS PLACED</div>
+                {batteries.filter(b => (allDefs[b.type] || {}).isSensor).map(b => {
+                  const def = allDefs[b.type] || {};
+                  return (
+                    <div key={b.uid} style={{ padding: '5px 6px', borderTop: '1px solid #16293c', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="f-mono" style={{ fontSize: 9, color: '#8fd0c4' }}>{def.tag || def.name}</span>
+                      <span className="f-mono" style={{ fontSize: 8, color: MUT }}>radar {def.detectKm} km</span>
+                      <button onClick={() => { setBatteries(prev => prev.filter(x => x.uid !== b.uid)); if (selBat === b.uid) setSelBat(null); }} className="f-mono" style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 7px', border: `1px solid ${RED}`, borderRadius: 3, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          <Section title="6 · ELECTRONIC WARFARE (РЕБ)">
+            <div className="f-mono" style={{ fontSize: 8, color: '#93a1b0', marginBottom: 6, lineHeight: 1.4 }}>
+              EW suites soft-kill drones and disrupt navigation/links inside their footprint (no missiles spent). Place them to thin OWA and recon before they reach the target.
+            </div>
+            <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' && (allDefs[placeMode] || {}).isEW ? '#93a1b0' : MUT, marginBottom: 5 }}>
+              {placeKind === 'battery' && (allDefs[placeMode] || {}).isEW ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name) : 'Pick an EW system below, then click the map.'}
+            </div>
+            <div className="f-mono" style={{ fontSize: 8, color: '#56a0e0', marginBottom: 3 }}>QUICK</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+              {Object.values(allDefs).filter(b => b.isEW && !/^lib_/.test(b.id)).map(b => {
+                const sel = placeMode === b.id && placeKind === 'battery';
+                return (
+                  <button key={b.id} onClick={() => { setPlaceKind('battery'); setPlaceMode(b.id); }} className="f-mono"
+                    style={{ fontSize: 10, padding: '6px 5px', textAlign: 'left', border: `1px solid ${sel ? '#93a1b0' : '#243d52'}`, borderRadius: 3, background: sel ? 'rgba(147,161,176,0.16)' : 'transparent', color: sel ? '#fff' : TEXT, cursor: 'pointer' }}>
+                    {b.tag || b.name}<br /><span style={{ color: MUT, fontSize: 8 }}>EW {b.detectKm} km</span>
+                  </button>
+                );
+              })}
+            </div>
+            {(() => {
+              const ewLib = libOptions.filter(e => e.cat === 'EW');
+              return (
+                <div style={{ marginTop: 8, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+                  <div className="f-mono" style={{ fontSize: 9, color: '#56a0e0', marginBottom: 3 }}>EW LIBRARY ({ewLib.length})</div>
+                  <select disabled={mapLocked} className="f-mono" value=""
+                    onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
+                    style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3 }}>
+                    <option value="" disabled>Pick an EW system…</option>
+                    {ewLib.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km</option>)}
+                  </select>
+                </div>
+              );
+            })()}
+            {batteries.filter(b => (allDefs[b.type] || {}).isEW).length > 0 && (
+              <div style={{ marginTop: 8, border: '1px solid #243d52', borderRadius: 3 }}>
+                <div className="f-mono" style={{ fontSize: 8, color: MUT, padding: '4px 6px', background: '#16293c' }}>EW PLACED</div>
+                {batteries.filter(b => (allDefs[b.type] || {}).isEW).map(b => {
+                  const def = allDefs[b.type] || {};
+                  return (
+                    <div key={b.uid} style={{ padding: '5px 6px', borderTop: '1px solid #16293c', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="f-mono" style={{ fontSize: 9, color: '#93a1b0' }}>{def.tag || def.name}</span>
+                      <span className="f-mono" style={{ fontSize: 8, color: MUT }}>EW {def.detectKm} km</span>
+                      <button onClick={() => { setBatteries(prev => prev.filter(x => x.uid !== b.uid)); if (selBat === b.uid) setSelBat(null); }} className="f-mono" style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 7px', border: `1px solid ${RED}`, borderRadius: 3, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          <Section title="7 · CONDITIONS">
             <div className="f-mono" style={{ fontSize: 9, color: MUT, margin: '0 0 2px' }}>SEASON</div>
             <Select value={season} onChange={setSeason} options={Object.values(SEASONS).map(s => [s.key, `${s.label} (${s.tempC > 0 ? '+' : ''}${s.tempC}°C)`])} />
             <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', margin: '3px 0 6px', lineHeight: 1.4 }}>{(SEASONS[season] || {}).notes}</div>
