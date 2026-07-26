@@ -69,14 +69,16 @@ const defaultReactDelay = (type) => {
   if (type === 'iris_t' || type === 'nasams') return 7;
   if (type === 'gepard') return 4;
   if (type === 'manpads' || type === 'int_team') return 5;
-  if (type === 'f16' || type === 'eurofighter' || type === 'f35') return 6; // fighter reaction once cued
+  const d = BATTERY_REAL[type];
+  if (d && d.isFighter && !d.isSensor) return 6; // fighter reaction once cued
   if (/^lib_/.test(type || '')) return 8;
   return 8;
 };
 const batColor = (id) => {
-  if (id === 'ewnode') return '#93a1b0';
-  if (id === 'radar_gbad' || id === 'awacs') return '#8fd0c4'; // sensors: teal
-  if (id === 'f16' || id === 'eurofighter' || id === 'f35') return '#c99be0'; // fighters: violet
+  const d = BATTERY_REAL[id];
+  if (id === 'ewnode' || (d && d.isEW)) return '#93a1b0';
+  if (id === 'radar_gbad' || id === 'awacs' || (d && d.isSensor)) return '#8fd0c4'; // sensors: teal
+  if (d && d.isFighter && !d.isSensor) return '#c99be0'; // fighters: violet
   if (id === 'patriot' || id === 'samp_t') return BLUE;
   if (id === 'iris_t' || id === 'nasams') return '#56a0e0';
   return '#7bb8d6';

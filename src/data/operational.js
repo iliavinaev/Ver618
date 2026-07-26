@@ -77,9 +77,44 @@ export const BATTERY_REAL = {
   // Fighters fly a patrol route and engage cruise / OWA / glide threats inside
   // their air-to-air missile reach. Airborne, so their radar sees low movers far
   // better than a ground mast (high effective mast height). rounds = A2A missiles.
-  f16:      { id: 'f16',      name: 'F-16 (AMRAAM CAP)',      tag: 'F-16 CAP',  nation: 'NATO', aeroRangeKm: 40, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 900, mastM: 8000, can: ['cruise','owa','glide','male','recon'] },
-  eurofighter: { id: 'eurofighter', name: 'Eurofighter (Meteor CAP)', tag: 'EF CAP', nation: 'NATO', aeroRangeKm: 80, tbmFootprintKm: 0, detectKm: 160, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.9, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
-  f35:      { id: 'f35',      name: 'F-35 (AMRAAM CAP)',      tag: 'F-35 CAP',  nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter', costM: 1.1, isFighter: true, speedKmh: 950, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  //
+  // aeroRangeKm here is the EFFECTIVE engagement reach against an air-breathing
+  // target (roughly the missile's no-escape / usable zone at the relevant
+  // geometry), not the missile's absolute max range: AMRAAM C ~40-55, AMRAAM D
+  // ~70-90, Meteor ~80-100, R-77/R-27 ~40-60, legacy IR/gun jets ~8-25. detectKm
+  // is the onboard radar's search range against a small target. All figures are
+  // illustrative open-source values, not validated OA.
+  //
+  // ===== Modern 4th / 5th generation (BVR: AMRAAM / Meteor) =====
+  f15:      { id: 'f15',      name: 'F-15 Eagle / Strike Eagle', tag: 'F-15',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 160, rounds: 8, reloadS: 45, role: 'CAP fighter', costM: 0.8, isFighter: true, speedKmh: 1100, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f16:      { id: 'f16',      name: 'F-16 Fighting Falcon',      tag: 'F-16',    nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 1000, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
+  fa18:     { id: 'fa18',     name: 'F/A-18 Hornet',             tag: 'F/A-18',  nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.6, isFighter: true, speedKmh: 1000, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
+  fa18ef:   { id: 'fa18ef',   name: 'F/A-18E/F Super Hornet',    tag: 'F-18EF',  nation: 'NATO', aeroRangeKm: 65, tbmFootprintKm: 0, detectKm: 150, rounds: 8, reloadS: 45, role: 'CAP fighter', costM: 0.8, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
+  f22:      { id: 'f22',      name: 'F-22A Raptor',              tag: 'F-22',    nation: 'NATO', aeroRangeKm: 80, tbmFootprintKm: 0, detectKm: 200, rounds: 6, reloadS: 45, role: 'CAP fighter (VLO)', costM: 1.5, isFighter: true, speedKmh: 1300, mastM: 15000, can: ['cruise','owa','glide','male','recon'] },
+  f35a:     { id: 'f35a',     name: 'F-35A Lightning II',        tag: 'F-35A',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (VLO)', costM: 1.1, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f35b:     { id: 'f35b',     name: 'F-35B Lightning II',        tag: 'F-35B',   nation: 'NATO', aeroRangeKm: 65, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (STOVL)', costM: 1.2, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f35c:     { id: 'f35c',     name: 'F-35C Lightning II',        tag: 'F-35C',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (carrier)', costM: 1.2, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  eurofighter: { id: 'eurofighter', name: 'Eurofighter Typhoon (Meteor)', tag: 'Typhoon', nation: 'NATO', aeroRangeKm: 90, tbmFootprintKm: 0, detectKm: 160, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.9, isFighter: true, speedKmh: 1100, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  rafale:   { id: 'rafale',   name: 'Dassault Rafale (Meteor)',  tag: 'Rafale',  nation: 'NATO', aeroRangeKm: 90, tbmFootprintKm: 0, detectKm: 150, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.9, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  gripen:   { id: 'gripen',   name: 'Saab JAS 39 Gripen (Meteor)', tag: 'Gripen', nation: 'NATO', aeroRangeKm: 85, tbmFootprintKm: 0, detectKm: 140, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
+  mirage2000:{ id: 'mirage2000', name: 'Dassault Mirage 2000',  tag: 'Mirage2k', nation: 'NATO', aeroRangeKm: 45, tbmFootprintKm: 0, detectKm: 100, rounds: 4, reloadS: 45, role: 'CAP fighter', costM: 0.4, isFighter: true, speedKmh: 1100, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
+  mig29:    { id: 'mig29',    name: 'MiG-29 (R-77 / R-27)',      tag: 'MiG-29',  nation: 'NATO', aeroRangeKm: 50, tbmFootprintKm: 0, detectKm: 100, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.3, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
+  fa50:     { id: 'fa50',     name: 'FA-50 Fighting Eagle',      tag: 'FA-50',   nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 80, rounds: 4, reloadS: 45, role: 'light CAP fighter', costM: 0.3, isFighter: true, speedKmh: 900, mastM: 8000, can: ['cruise','owa','glide','male','recon'] },
+  // ===== 1960s-1990s (gun + BVR/IR; effective vs cruise but shorter reach) =====
+  f4:       { id: 'f4',       name: 'F-4 Phantom II',            tag: 'F-4',     nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 70, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.2, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','recon'] },
+  f14:      { id: 'f14',      name: 'F-14 Tomcat',               tag: 'F-14',    nation: 'NATO', aeroRangeKm: 60, tbmFootprintKm: 0, detectKm: 130, rounds: 6, reloadS: 60, role: 'legacy interceptor', costM: 0.4, isFighter: true, speedKmh: 1200, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f8:       { id: 'f8',       name: 'F-8 Crusader',              tag: 'F-8',     nation: 'NATO', aeroRangeKm: 18, tbmFootprintKm: 0, detectKm: 55, rounds: 4, reloadS: 60, role: 'legacy day fighter', costM: 0.15, isFighter: true, speedKmh: 1000, mastM: 8000, can: ['cruise','owa','recon'] },
+  miragef1: { id: 'miragef1', name: 'Mirage F1',                 tag: 'MirageF1', nation: 'NATO', aeroRangeKm: 25, tbmFootprintKm: 0, detectKm: 70, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.15, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','recon'] },
+  tornadoadv:{ id: 'tornadoadv', name: 'Tornado ADV F.3',       tag: 'TornadoF3', nation: 'NATO', aeroRangeKm: 45, tbmFootprintKm: 0, detectKm: 110, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.25, isFighter: true, speedKmh: 1100, mastM: 10000, can: ['cruise','owa','glide','recon'] },
+  a10:      { id: 'a10',      name: 'A-10 Thunderbolt II',       tag: 'A-10',    nation: 'NATO', aeroRangeKm: 6, tbmFootprintKm: 0, detectKm: 20, rounds: 2, reloadS: 45, role: 'CAS (self-defence AAM)', costM: 0.1, isFighter: true, speedKmh: 700, mastM: 4000, can: ['owa','recon'] },
+  harrier:  { id: 'harrier',  name: 'Harrier / Sea Harrier',     tag: 'Harrier', nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 90, rounds: 4, reloadS: 60, role: 'legacy STOVL fighter', costM: 0.2, isFighter: true, speedKmh: 900, mastM: 8000, can: ['cruise','owa','recon'] },
+  // ===== 1950s-1960s (guns + early IR; marginal vs modern threats) =====
+  f104:     { id: 'f104',     name: 'F-104 Starfighter',         tag: 'F-104',   nation: 'NATO', aeroRangeKm: 12, tbmFootprintKm: 0, detectKm: 45, rounds: 2, reloadS: 60, role: 'legacy interceptor', costM: 0.08, isFighter: true, speedKmh: 1300, mastM: 9000, can: ['cruise','owa','recon'] },
+  f5:       { id: 'f5',       name: 'F-5 Tiger / Tiger II',      tag: 'F-5',     nation: 'NATO', aeroRangeKm: 12, tbmFootprintKm: 0, detectKm: 40, rounds: 2, reloadS: 60, role: 'legacy light fighter', costM: 0.06, isFighter: true, speedKmh: 1000, mastM: 8000, can: ['cruise','owa','recon'] },
+  f100:     { id: 'f100',     name: 'F-100 Super Sabre',         tag: 'F-100',   nation: 'NATO', aeroRangeKm: 10, tbmFootprintKm: 0, detectKm: 30, rounds: 2, reloadS: 60, role: 'legacy day fighter', costM: 0.05, isFighter: true, speedKmh: 900, mastM: 7000, can: ['cruise','owa','recon'] },
+  mirage3:  { id: 'mirage3',  name: 'Mirage III',                tag: 'MirageIII', nation: 'NATO', aeroRangeKm: 14, tbmFootprintKm: 0, detectKm: 45, rounds: 2, reloadS: 60, role: 'legacy interceptor', costM: 0.06, isFighter: true, speedKmh: 1100, mastM: 8000, can: ['cruise','owa','recon'] },
+  draken:   { id: 'draken',   name: 'Saab J 35 Draken',          tag: 'Draken',  nation: 'NATO', aeroRangeKm: 14, tbmFootprintKm: 0, detectKm: 45, rounds: 2, reloadS: 60, role: 'legacy interceptor', costM: 0.06, isFighter: true, speedKmh: 1100, mastM: 8000, can: ['cruise','owa','recon'] },
+  lightning:{ id: 'lightning', name: 'English Electric Lightning', tag: 'Lightning', nation: 'NATO', aeroRangeKm: 12, tbmFootprintKm: 0, detectKm: 45, rounds: 2, reloadS: 60, role: 'legacy interceptor', costM: 0.06, isFighter: true, speedKmh: 1200, mastM: 9000, can: ['cruise','owa','recon'] },
   // --- Sensors (detection only, no weapons) ---
   radar_gbad: { id: 'radar_gbad', name: 'Ground radar (GBAD)', tag: 'RADAR', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 150, rounds: 0, reloadS: 0, role: 'sensor', isSensor: true, mastM: 30, costM: 0.1, can: [] },
   awacs:    { id: 'awacs',    name: 'AWACS (airborne radar)', tag: 'AWACS', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 400, rounds: 0, reloadS: 0, role: 'sensor (airborne)', isSensor: true, isFighter: true, speedKmh: 700, mastM: 10000, costM: 2.0, can: [] },
@@ -125,10 +160,38 @@ export const OP_PK = {
   manpads: { ballistic: 0.0,  cruise: 0.10, owa: 0.50, glide: 0.15 },
   ewnode:  { ballistic: 0.0,  cruise: 0.0,  owa: 0.0,  glide: 0.0 },
   // Fighters with A2A missiles are effective against cruise missiles and drones
-  // but cannot touch ballistic. Meteor (Eurofighter) is the longest-legged shot.
-  f16:         { ballistic: 0.0, cruise: 0.70, owa: 0.62, glide: 0.55, male: 0.65 },
-  eurofighter: { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
-  f35:         { ballistic: 0.0, cruise: 0.75, owa: 0.66, glide: 0.60, male: 0.68 },
+  // but cannot touch ballistic. Modern BVR (AMRAAM/Meteor) jets score highest;
+  // legacy gun/IR jets are progressively weaker against small modern threats.
+  // ===== modern 4th/5th gen =====
+  f15:         { ballistic: 0.0, cruise: 0.76, owa: 0.66, glide: 0.60, male: 0.68 },
+  f16:         { ballistic: 0.0, cruise: 0.72, owa: 0.64, glide: 0.57, male: 0.66 },
+  fa18:        { ballistic: 0.0, cruise: 0.72, owa: 0.64, glide: 0.57, male: 0.66 },
+  fa18ef:      { ballistic: 0.0, cruise: 0.76, owa: 0.66, glide: 0.60, male: 0.68 },
+  f22:         { ballistic: 0.0, cruise: 0.82, owa: 0.72, glide: 0.66, male: 0.74 },
+  f35a:        { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
+  f35b:        { ballistic: 0.0, cruise: 0.77, owa: 0.67, glide: 0.61, male: 0.69 },
+  f35c:        { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
+  eurofighter: { ballistic: 0.0, cruise: 0.80, owa: 0.70, glide: 0.64, male: 0.72 },
+  rafale:      { ballistic: 0.0, cruise: 0.80, owa: 0.70, glide: 0.64, male: 0.72 },
+  gripen:      { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
+  mirage2000:  { ballistic: 0.0, cruise: 0.66, owa: 0.58, glide: 0.52, male: 0.58 },
+  mig29:       { ballistic: 0.0, cruise: 0.64, owa: 0.58, glide: 0.50, male: 0.56 },
+  fa50:        { ballistic: 0.0, cruise: 0.58, owa: 0.54, glide: 0.46, male: 0.52 },
+  // ===== 1960s-1990s =====
+  f4:          { ballistic: 0.0, cruise: 0.48, owa: 0.48, glide: 0.40, male: 0.0 },
+  f14:         { ballistic: 0.0, cruise: 0.66, owa: 0.58, glide: 0.52, male: 0.58 },
+  f8:          { ballistic: 0.0, cruise: 0.34, owa: 0.42, glide: 0.0,  male: 0.0 },
+  miragef1:    { ballistic: 0.0, cruise: 0.42, owa: 0.46, glide: 0.36, male: 0.0 },
+  tornadoadv:  { ballistic: 0.0, cruise: 0.60, owa: 0.54, glide: 0.48, male: 0.0 },
+  a10:         { ballistic: 0.0, cruise: 0.0,  owa: 0.30, glide: 0.0,  male: 0.0 },
+  harrier:     { ballistic: 0.0, cruise: 0.40, owa: 0.46, glide: 0.0,  male: 0.0 },
+  // ===== 1950s-1960s (marginal vs modern threats) =====
+  f104:        { ballistic: 0.0, cruise: 0.18, owa: 0.34, glide: 0.0,  male: 0.0 },
+  f5:          { ballistic: 0.0, cruise: 0.20, owa: 0.36, glide: 0.0,  male: 0.0 },
+  f100:        { ballistic: 0.0, cruise: 0.14, owa: 0.30, glide: 0.0,  male: 0.0 },
+  mirage3:     { ballistic: 0.0, cruise: 0.18, owa: 0.34, glide: 0.0,  male: 0.0 },
+  draken:      { ballistic: 0.0, cruise: 0.18, owa: 0.34, glide: 0.0,  male: 0.0 },
+  lightning:   { ballistic: 0.0, cruise: 0.20, owa: 0.34, glide: 0.0,  male: 0.0 },
   radar_gbad:  { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
   awacs:       { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
 };
