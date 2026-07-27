@@ -263,6 +263,7 @@ export function initSim(plan, seed) {
     env, seasonObj, tEff, weather: plan.weather,
     pkProfile: plan.pkProfile, salvoKey: env.salvoKey || 'single',
     miss: { reliability: 0, tracklow: 0, saturation: 0, weather: 0, misclassified: 0 },
+    eventFires: {},   // how often each user-defined event fired this run
   };
 }
 
@@ -278,18 +279,83 @@ export function stepSim(sim, dtSec, nowMsForReload) {
   // complete reloads (real-time gated by the caller's clock)
   sim.bats.forEach(b => { if (b.reloadUntil && now >= b.reloadUntil) { b.ammo = b.maxAmmo; b.reloadUntil = 0; } });
 
-  // move fighters / AWACS along their patrol loop. A patrol with one point is a
-  // loiter (stationary); with 2+ points the aircraft flies leg to leg and, at the
-  // end, reverses direction (a racetrack back-and-forth). Position updates feed
-  // both its radar coverage and its air-to-air engagement zone.
+  // Fighters and AWACS. A fighter does not simply orbit: once the network holds
+  // a threat it can engage, it breaks off the patrol and flies a lead-intercept
+  // course onto it, engages when the target enters air-to-air reach, then returns
+  // to the patrol when the target is resolved or runs beyond its reach. AWACS and
+  // other sensors never chase; they only fly the route.
   sim.bats.forEach(b => {
-    if (!b.isFighter || !b.patrol || b.disabled) return;
-    if (b.patrol.length < 2 || !b.speedKmh) { // single-point loiter: sit on it
-      if (b.patrol.length >= 1) { b.lat = b.patrol[0].lat; b.lng = b.patrol[0].lng; }
+    if (!b.isFighter || b.disabled) return;
+    const stepKmMax = (b.speedKmh / 3600) * dtSec;
+    if (!stepKmMax) { if (b.patrol && b.patrol.length) { b.lat = b.patrol[0].lat; b.lng = b.patrol[0].lng; } return; }
+
+    // ---- 1. hold or acquire an intercept target ----
+    const reachKm = b.detectKm || b.def.detectKm || 0;
+    const dropKm = reachKm * 1.5;              // give up if it outruns the picture
+    let tgt = (b.chase != null) ? sim.tracks[b.chase] : null;
+    if (tgt && (tgt.done || kmBetween(b, tgt.pos) > dropKm)) { tgt = null; b.chase = null; }
+    const canChase = !b.isSensor && b.engage !== false && b.ammo > 0 && Array.isArray(b.def.can) && b.def.can.length;
+    if (!tgt && canChase) {
+      let bestD = reachKm, bestI = null;
+      for (let i = 0; i < sim.tracks.length; i++) {
+        const tr = sim.tracks[i];
+        if (tr.done) continue;
+        if (!tr._detected) continue;                  // only what a radar actually holds
+        if (!b.def.can.includes(tr.family)) continue; // cannot touch ballistic
+        const d = kmBetween(b, tr.pos);
+        if (d < bestD) { bestD = d; bestI = i; }
+      }
+      if (bestI != null) { b.chase = bestI; tgt = sim.tracks[bestI]; }
+    }
+    if (!canChase) { b.chase = null; tgt = null; }
+    b.vectoring = !!tgt;
+
+    // ---- 2a. vectoring: fly a lead-intercept course ----
+    if (tgt) {
+      const kmLat = 111.32, kmLng = 111.32 * Math.cos(b.lat * Math.PI / 180) || 1e-6;
+      const rx = (tgt.pos.lng - b.lng) * kmLng;   // east offset, km
+      const ry = (tgt.pos.lat - b.lat) * kmLat;   // north offset, km
+      const th = ((tgt.heading || 0) * Math.PI) / 180;
+      const vt = (tgt.kmh || 0) / 3600;           // km/s
+      const vtx = vt * Math.sin(th), vty = vt * Math.cos(th);
+      const vf = b.speedKmh / 3600;
+      // solve |r + v_t·t| = v_f·t  for the earliest positive t
+      const qa = vtx * vtx + vty * vty - vf * vf;
+      const qb = 2 * (rx * vtx + ry * vty);
+      const qc = rx * rx + ry * ry;
+      let t = null;
+      if (Math.abs(qa) < 1e-12) { if (Math.abs(qb) > 1e-12) { const r0 = -qc / qb; if (r0 > 0) t = r0; } }
+      else {
+        const disc = qb * qb - 4 * qa * qc;
+        if (disc >= 0) {
+          const sq = Math.sqrt(disc);
+          const roots = [(-qb + sq) / (2 * qa), (-qb - sq) / (2 * qa)].filter(x => x > 0 && isFinite(x));
+          if (roots.length) t = Math.min.apply(null, roots);
+        }
+      }
+      // aim at the predicted point; if no solution (target outruns us) pursue directly
+      const ax = (t != null) ? rx + vtx * t : rx;
+      const ay = (t != null) ? ry + vty * t : ry;
+      const mag = Math.hypot(ax, ay);
+      if (mag > 1e-6) {
+        const step = Math.min(stepKmMax, mag);
+        b.lng += (ax / mag * step) / kmLng;
+        b.lat += (ay / mag * step) / kmLat;
+        b.heading = (Math.atan2(ax, ay) * 180 / Math.PI + 360) % 360;
+      }
       return;
     }
-    let stepKm = (b.speedKmh / 3600) * dtSec;
-    // advance along legs, consuming stepKm, bouncing at the ends of the route
+
+    // ---- 2b. no target: fly the patrol loop (racetrack, reversing at the ends) ----
+    if (!b.patrol || !b.patrol.length) return;
+    if (b.patrol.length < 2) { // single point = loiter: fly to it and hold
+      const wp = b.patrol[0];
+      const d = kmBetween(b, wp);
+      if (d <= stepKmMax) { b.lat = wp.lat; b.lng = wp.lng; }
+      else { const f = stepKmMax / d; b.lat += (wp.lat - b.lat) * f; b.lng += (wp.lng - b.lng) * f; }
+      return;
+    }
+    let stepKm = stepKmMax;
     let guard = 0;
     while (stepKm > 0 && guard++ < 50) {
       const nextIdx = b.patLeg + b.patDir;
@@ -300,6 +366,7 @@ export function stepSim(sim, dtSec, nowMsForReload) {
       else {
         const f = stepKm / d;
         b.lat += (wp.lat - b.lat) * f; b.lng += (wp.lng - b.lng) * f; stepKm = 0;
+        b.heading = (Math.atan2((wp.lng - b.lng) * Math.cos(b.lat * Math.PI / 180), wp.lat - b.lat) * 180 / Math.PI + 360) % 360;
       }
     }
   });
@@ -494,9 +561,25 @@ export function stepSim(sim, dtSec, nowMsForReload) {
         const sat = saturationFactor(near, b.channels || 2);
         const optical = b.def.cat === 'GUN_LASER' || b.type === 'gepard' || b.type === 'mobile' || b.type === 'int_team' || b.type === 'manpads';
         const we = weatherEffects(sim.weather, optical ? 'gepard' : b.type, tr.family);
+        // User-defined probabilistic events. Each event has a chance of firing on
+        // any given engagement; when it fires it shifts the kill probability by
+        // its stated percentage. Rolls come from the seeded generator, so a run
+        // stays reproducible and Monte-Carlo averages over the events properly.
+        let eventPkMul = 1;
+        const evList = sim.env.events;
+        if (evList && evList.length) {
+          for (let ei = 0; ei < evList.length; ei++) {
+            const ev = evList[ei];
+            const p = Math.max(0, Math.min(100, +ev.probPct || 0)) / 100;
+            if (p > 0 && rng() < p) {
+              eventPkMul *= Math.max(0, 1 + (+ev.pkDeltaPct || 0) / 100);
+              sim.eventFires[ev.id || ei] = (sim.eventFires[ev.id || ei] || 0) + 1;
+            }
+          }
+        }
         let pk = resolveShotPk({
           basePk: ((sim.pkProfile(b.type) || {})[normFam(tr.family)] || 0) * (b.pkMul || 1),
-          shots: sN, weatherPkMul: we.pkMul, crosswindMul: crosswindPkMul(sim.weather),
+          shots: sN, weatherPkMul: we.pkMul * eventPkMul, crosswindMul: crosswindPkMul(sim.weather),
           nSensors: tr._nSensors || 1, altBandKey: tr.altKey, jammed: sim.env.jamming,
           fatigue, saturation: sat, icing: icingPenalty(sim.seasonObj.icing, b.type),
           optical, temperatureOpticalMul: sim.tEff.opticalMul,

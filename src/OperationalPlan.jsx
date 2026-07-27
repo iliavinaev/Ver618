@@ -262,6 +262,9 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const [centralised, setCentralised] = useState(false);
   const [jamming, setJamming] = useState(false);
   const [crewFatigue, setCrewFatigue] = useState(true); // optional: AD crew fatigue over long ops
+  // user-defined probabilistic events: each has a chance of firing per engagement
+  // and shifts kill probability by its stated percentage when it does
+  const [events, setEvents] = useState([]); // [{id,label,probPct,pkDeltaPct}]
   const weather = useMemo(() => makeWeather(wxPreset, 45, windKmh, night), [wxPreset, windKmh, night]);
   const seasonRef = useRef('autumn'); seasonRef.current = season;
   const envRef = useRef({}); envRef.current = { season, coldStart, centralised, jamming, night };
@@ -301,7 +304,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     return {
       id: 'usr_' + Date.now(), name: name || ('Scenario ' + new Date().toLocaleString()), saved: Date.now(), user: true,
       capCodes, targets, batteries, planWaves,
-      env: { season, wxPreset, windKmh, night, coldStart, centralised, jamming, salvoKey, crewFatigue },
+      env: { season, wxPreset, windKmh, night, coldStart, centralised, jamming, salvoKey, crewFatigue, events },
     };
   }
   function applyScenario(sc) {
@@ -929,7 +932,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           return { type: cr.type, family: meta.family, from: cr.from || 'custom', target: (cr.target && cr.target !== 'manual') ? cr.target : 'all', count: +cr.count || 1, spacingSec: +cr.spacingSec || 30, startGH: +cr.startGH || 0, kmh: meta.kmh, dmg: meta.dmg, maneuver: meta.maneuver, gLimit: meta.gLimit, mirv: meta.mirv, mirvSplitKm: meta.mirvSplitKm, customPoints: cr.points };
         }),
       ],
-      env: { season, night, coldStart, centralised, jamming, windKmh, wxPreset, salvoKey, crewFatigue },
+      env: { season, night, coldStart, centralised, jamming, windKmh, wxPreset, salvoKey, crewFatigue, events },
       weather,
     };
   }
@@ -1013,6 +1016,15 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           ctx.strokeStyle = 'rgba(143,208,196,0.10)'; ctx.setLineDash([2, 7]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
         }
         if (b.isFighter) {
+          // If the aircraft has broken off to intercept, draw the vector to its
+          // target so the decision is visible rather than implied.
+          if (b.vectoring && b.chase != null && sim.tracks[b.chase] && !sim.tracks[b.chase].done) {
+            const tp = PX(sim.tracks[b.chase].pos);
+            ctx.strokeStyle = 'rgba(201,155,224,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+            ctx.beginPath(); ctx.moveTo(bp.x, bp.y); ctx.lineTo(tp.x, tp.y); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = '#e3ccf0'; ctx.font = '7px monospace';
+            ctx.fillText('INTERCEPTING', bp.x + 8, bp.y + 12);
+          }
           // aircraft marker with a velocity vector: the line points in the
           // direction of travel and its length scales with real speed, so faster
           // aircraft visibly show a longer vector. Track last position for heading.
@@ -1126,6 +1138,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     const resolvedReal = Math.max(1, realThreats - realUnresolved);
     setReport({
       aborted: !!aborted, total, killed, leaked, unresolved, decoys, realThreats, realLeaked,
+      eventFires: { ...(sim.eventFires || {}) }, eventDefs: (sim.env && sim.env.events) || [],
       rate: total ? killed / total : 0,
       protect: 1 - realLeaked / resolvedReal,
       byFam, shots, kills, spendBySys,
@@ -1667,7 +1680,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginTop: 6, lineHeight: 1.4 }}>Low-altitude cruise/OWA leak more (radar horizon); winter degrades guns/drones; jamming hurts track quality.</div>
           </Section>
 
-          <Section title="9 · OPTIONS (advanced)" defaultOpen={false} badge={[crewFatigue && "fatigue", coldStart && "cold", centralised && "C2"].filter(Boolean).join(" · ")}>
+          <Section title="9 · OPTIONS (advanced)" defaultOpen={false} badge={[crewFatigue && "fatigue", coldStart && "cold", centralised && "C2", events.length && (events.length + " event" + (events.length > 1 ? "s" : ""))].filter(Boolean).join(" · ")}>
             <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 6, lineHeight: 1.4 }}>Optional realism factors. Leave defaults for a standard run.</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <label className="f-mono" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 10, color: TEXT, cursor: 'pointer' }}>
@@ -1682,6 +1695,31 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                 <input type="checkbox" checked={centralised} onChange={e => setCentralised(e.target.checked)} style={{ marginTop: 2 }} />
                 <span>Centralised C2<br /><span style={{ color: '#5d6b7a', fontSize: 8 }}>Single decision node; adds command-info delay before firing.</span></span>
               </label>
+            </div>
+
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #243d52' }}>
+              <div className="f-mono" style={{ fontSize: 9, color: '#d9a52f', marginBottom: 3 }}>PROBABILISTIC EVENTS</div>
+              <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 6, lineHeight: 1.45 }}>
+                Define your own uncertainty. Each event is rolled independently on every engagement: give it a chance of occurring and how much it shifts kill probability when it does. Use a negative shift for a degrading event (jamming burst, sensor dropout, bad hand-off) and a positive one for a favourable one.
+              </div>
+              {events.length > 0 && (
+                <div style={{ border: '1px solid #243d52', borderRadius: 3, marginBottom: 6 }}>
+                  {events.map((ev, i) => (
+                    <div key={ev.id} style={{ padding: '5px 6px', borderTop: i ? '1px solid #16293c' : 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span className="f-mono" style={{ fontSize: 9, color: TEXT, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.label}</span>
+                      <span className="f-mono" style={{ fontSize: 8, color: AMBER }}>{ev.probPct}%</span>
+                      <span className="f-mono" style={{ fontSize: 8, color: ev.pkDeltaPct < 0 ? RED : GREEN }}>{ev.pkDeltaPct > 0 ? '+' : ''}{ev.pkDeltaPct}% Pk</span>
+                      <button onClick={() => setEvents(p => p.filter(x => x.id !== ev.id))} className="f-mono" style={{ fontSize: 9, padding: '1px 6px', border: `1px solid ${RED}`, borderRadius: 3, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <EventAdder onAdd={(label, probPct, pkDeltaPct) => setEvents(p => [...p, { id: 'ev' + Date.now() + Math.floor(Math.random() * 1000), label, probPct, pkDeltaPct }])} />
+              {events.length > 0 && (
+                <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginTop: 6, lineHeight: 1.4 }}>
+                  Events are rolled from the seeded generator, so a run stays reproducible. Run Monte-Carlo to see the average effect rather than one draw.
+                </div>
+              )}
             </div>
           </Section>
         </div>
@@ -2178,6 +2216,16 @@ function FinalReport({ report, onClose, onExport }) {
             <Big label="DEFENCE SPEND" v={`$${f.spentM.toFixed(1)}M`} c={BLUE} sub={`$${f.perKillM.toFixed(2)}M per kill`} />
             <Big label="COST EXCHANGE" v={`${f.exchange.toFixed(1)} : 1`} c={f.exchange >= 1 ? GREEN : AMBER} sub="threat value killed vs spend" />
           </div>
+          {report.eventDefs && report.eventDefs.length > 0 && (
+            <div className="f-mono" style={{ fontSize: 10, color: '#93a1b0', padding: '8px 10px', border: '1px solid #243d52', borderRadius: 3, marginBottom: 12, lineHeight: 1.6 }}>
+              <span style={{ color: '#d9a52f' }}>PROBABILISTIC EVENTS</span><br />
+              {report.eventDefs.map(ev => (
+                <span key={ev.id} style={{ display: 'block' }}>
+                  {ev.label}: set at {ev.probPct}% chance, {ev.pkDeltaPct > 0 ? '+' : ''}{ev.pkDeltaPct}% Pk · fired on {report.eventFires[ev.id] || 0} engagement(s)
+                </span>
+              ))}
+            </div>
+          )}
           {report.unresolved > 0 && (
             <div className="f-mono" style={{ fontSize: 10, color: AMBER, padding: '8px 10px', border: '1px solid rgba(217,165,47,0.5)', borderRadius: 3, marginBottom: 12, lineHeight: 1.5 }}>
               ⚠ {report.unresolved} threat(s) were still in flight when the run's time limit was reached and are NOT counted as hits or intercepts. This happens with very long-range raids; the simulated flight simply had not finished. Launch from a closer origin, or let the run play longer, for a complete result.
@@ -2304,6 +2352,33 @@ const btn = (c) => ({ fontSize: 11, padding: '7px 12px', border: `1px solid ${c}
 const actBtn = (c, dis) => ({ flex: 1, fontSize: 12, padding: '10px', border: `1px solid ${c}`, borderRadius: 3, background: dis ? '#16293c' : 'rgba(47,128,214,0.10)', color: dis ? MUT : '#fff', cursor: dis ? 'not-allowed' : 'pointer', letterSpacing: '0.03em' });
 const miniIn = { width: '100%', fontSize: 10, padding: '4px 3px', background: '#0a1626', border: '1px solid #243d52', color: '#dde3ea', borderRadius: 3 };
 function MiniField({ label, children }) { return <div><div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginBottom: 1 }}>{label}</div>{children}</div>; }
+// Small inline editor for a user-defined probabilistic event.
+function EventAdder({ onAdd }) {
+  const [label, setLabel] = useState('');
+  const [prob, setProb] = useState(20);
+  const [delta, setDelta] = useState(-25);
+  const ok = label.trim().length > 0 && prob > 0;
+  const inp = { fontSize: 9, padding: '3px 5px', background: '#0a1626', border: '1px solid #34516b', borderRadius: 3, color: '#fff' };
+  return (
+    <div style={{ border: '1px solid #243d52', borderRadius: 3, padding: 6 }}>
+      <input value={label} onChange={e => setLabel(e.target.value)} placeholder="event name, e.g. GPS jamming burst"
+        className="f-mono" style={{ ...inp, width: '100%', marginBottom: 5 }} />
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="f-mono" style={{ fontSize: 8, color: '#93a1b0' }}>CHANCE</span>
+        <input type="number" min={1} max={100} value={prob} onChange={e => setProb(Math.max(1, Math.min(100, +e.target.value || 0)))} className="f-mono" style={{ ...inp, width: 52 }} />
+        <span className="f-mono" style={{ fontSize: 8, color: '#93a1b0' }}>%</span>
+        <span className="f-mono" style={{ fontSize: 8, color: '#93a1b0', marginLeft: 4 }}>Pk SHIFT</span>
+        <input type="number" min={-100} max={100} step={5} value={delta} onChange={e => setDelta(Math.max(-100, Math.min(100, +e.target.value || 0)))} className="f-mono" style={{ ...inp, width: 58 }} />
+        <span className="f-mono" style={{ fontSize: 8, color: '#93a1b0' }}>%</span>
+      </div>
+      <button onClick={() => { if (!ok) return; onAdd(label.trim(), prob, delta); setLabel(''); }} disabled={!ok}
+        className="f-mono" style={{ width: '100%', marginTop: 6, fontSize: 9, padding: '4px', borderRadius: 3, border: `1px solid ${ok ? '#d9a52f' : '#243d52'}`, background: ok ? 'rgba(217,165,47,0.16)' : 'transparent', color: ok ? '#fff' : '#5d6b7a', cursor: ok ? 'pointer' : 'not-allowed' }}>
+        + ADD EVENT
+      </button>
+    </div>
+  );
+}
+
 // Collapsible planning stage. Collapsed stages still show a badge summarising
 // what is inside them, so the rail reads as a checklist at a glance.
 function Section({ title, children, defaultOpen = true, badge = null }) {
