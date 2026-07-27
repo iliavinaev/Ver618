@@ -99,7 +99,7 @@ function systemSlot(def) {
   if (def.isFighter) return 'fighter';
   const id = def.id || '';
   if (id === 'int_team' || /interceptor drone/i.test(def.name || '') || (def.lib && def.cat === 'INTERCEPTOR')) return 'drone';
-  if (id === 'gepard' || id === 'mobile' || id === 'manpads' || (def.lib && (def.cat === 'GUN_LASER' || def.cat === 'MANPADS'))) return 'guns';
+  if (id === 'gepard' || id === 'mobile' || id === 'manpads' || (def.lib && (def.cat === 'GUN_LASER' || def.cat === 'MANPADS' || def.cat === 'MVG'))) return 'guns';
   // everything else with a real engagement ring is a guided SAM
   return (def.aeroRangeKm >= 20) ? 'sam' : 'guns';
 }
@@ -286,7 +286,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const playingRef = useRef(false); playingRef.current = playing;
   const [selBat, setSelBat] = useState(null); // uid of battery whose control panel is open
   const [libCat, setLibCat] = useState('SAM'); // which library category is shown in the AD picker
-  const [gunLibCat, setGunLibCat] = useState('GUN_LASER'); // fire-groups library tab
+  const [gunLibCat, setGunLibCat] = useState('MVG'); // fire-groups library tab
   const [patrolFor, setPatrolFor] = useState(null); // uid of fighter whose patrol is being drawn
   const patrolForRef = useRef(patrolFor); patrolForRef.current = patrolFor;
   const [liveAmmo, setLiveAmmo] = useState({}); // uid -> ammo, surfaced from sim for the panel
@@ -698,32 +698,46 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   }
 
   // ---- defence library binding ----
+  // RED_* entries are enemy systems held for reference only: they are browsable in
+  // the library screen but never placeable as a friendly defence.
   const libOptions = useMemo(() => AD_LIBRARY
     .map((e, i) => ({ ...e, idx: i }))
-    .filter(e => e.rangeKm > 0)
+    .filter(e => e.rangeKm > 0 && !/^RED_/.test(e.cat || ''))
     .sort((a, b) => (a.cat === b.cat ? (b.rangeKm - a.rangeKm) : a.cat.localeCompare(b.cat))), []);
   function addFromLibrary(idxStr) {
     const idx = +idxStr; if (Number.isNaN(idx)) return;
     const e = AD_LIBRARY[idx]; if (!e || !e.rangeKm) return;
+    if (/^RED_/.test(e.cat || '')) return; // reference only, not a friendly asset
     const type = 'lib_' + idx;
     if (allDefs[type]) { setPlaceKind('battery'); setPlaceMode(type); return; }
+    const isSensorCat = e.cat === 'RADAR' || e.cat === 'ESM';
     const abm = /patriot|samp\/t|arrow|thaad|sm-3|sm-6|david/i.test(e.name) || /bmd/i.test(e.cls || '');
-    const reloadByCat = { GUN_LASER: 4, MANPADS: 10, INTERCEPTOR: 20, EW: 0, SHORAD: 6, MR_SAM: 8, LR_SAM: 12 };
+    const reloadByCat = { GUN_LASER: 4, MVG: 5, MANPADS: 10, INTERCEPTOR: 20, EW: 0, RADAR: 0, ESM: 0, SHORAD: 6, MR_SAM: 8, LR_SAM: 12 };
     // engageable classes by category, following Ukrainian practice
     let can;
-    if (e.cat === 'EW') can = ['owa', 'recon'];
+    if (isSensorCat) can = [];                                   // sensors never fire
+    else if (e.cat === 'EW') can = ['owa', 'recon'];
     else if (e.cat === 'GUN_LASER') can = ['owa', 'glide', 'male', 'cruise'];
+    else if (e.cat === 'MVG') can = ['owa', 'tactical', 'recon', 'cruise'];
     else if (e.cat === 'MANPADS') can = ['owa', 'glide', 'male', 'cruise'];
     else if (e.cat === 'INTERCEPTOR') can = ['owa', 'male'];
     else if (abm) can = ['ballistic', 'cruise', 'owa', 'glide', 'male'];
     else can = ['cruise', 'owa', 'glide', 'male']; // generic SAM
     const def = {
       id: type, name: e.name, tag: e.name.length > 15 ? e.name.slice(0, 14) + '…' : e.name,
-      aeroRangeKm: e.rangeKm, tbmFootprintKm: abm ? 25 : 0,
-      detectKm: Math.min(Math.max(e.rangeKm * 1.3, e.rangeKm + 10), 400),
-      rounds: e.cat === 'GUN_LASER' ? 40 : e.cat === 'MANPADS' ? 8 : e.cat === 'INTERCEPTOR' ? 10 : e.cat === 'EW' ? 0 : 12,
-      costM: e.cat === 'GUN_LASER' ? 0.004 : e.cat === 'MANPADS' ? 0.15 : e.cat === 'INTERCEPTOR' ? 0.01 : e.cat === 'EW' ? 0 : (e.rangeKm >= 100 ? 4.0 : e.rangeKm >= 25 ? 0.8 : 0.4),
-      reloadS: reloadByCat[e.cat] != null ? reloadByCat[e.cat] : 8, isEW: e.cat === 'EW', cat: e.cat, can, lib: true, nation: e.country || e.nation || '',
+      // a sensor has no engagement ring; its rangeKm IS its detection range
+      aeroRangeKm: isSensorCat ? 0 : e.rangeKm,
+      tbmFootprintKm: abm ? 25 : 0,
+      detectKm: isSensorCat ? e.rangeKm : Math.min(Math.max(e.rangeKm * 1.3, e.rangeKm + 10), 400),
+      rounds: isSensorCat ? 0 : e.cat === 'GUN_LASER' ? 40 : e.cat === 'MVG' ? 60 : e.cat === 'MANPADS' ? 8 : e.cat === 'INTERCEPTOR' ? 10 : e.cat === 'EW' ? 0 : 12,
+      costM: isSensorCat ? (e.rangeKm >= 200 ? 0.4 : 0.1) : e.cat === 'GUN_LASER' ? 0.004 : e.cat === 'MVG' ? ((e.costPerTarget || 400) / 1e6) : e.cat === 'MANPADS' ? 0.15 : e.cat === 'INTERCEPTOR' ? 0.01 : e.cat === 'EW' ? 0 : (e.rangeKm >= 100 ? 4.0 : e.rangeKm >= 25 ? 0.8 : 0.4),
+      reloadS: reloadByCat[e.cat] != null ? reloadByCat[e.cat] : 8,
+      isEW: e.cat === 'EW', isSensor: isSensorCat, passive: e.cat === 'ESM',
+      // a mobile fire group's ceiling is a hard altitude gate, the core of the
+      // "2-4 km drone profile" problem: keep it on the def for the panel to show
+      ceilM: e.altKm ? Math.round(e.altKm * 1000) : null,
+      reactS: e.reactS != null ? e.reactS : null,
+      cat: e.cat, can, lib: true, nation: e.country || e.nation || '',
     };
     persistLibDefs({ ...libDefs, [type]: def });
     setPlaceKind('battery');
@@ -1253,7 +1267,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         {/* ---- left rail (DEFENCE): region + batteries + environment ---- */}
         <div style={{ width: 286, borderRight: '1px solid #243d52', overflowY: 'auto', padding: 12, background: '#0c1c2e' }}>
           <div className="f-display" style={{ fontSize: 12, color: BLUE, letterSpacing: '0.08em', padding: '4px 8px', marginBottom: 10, border: `1px solid ${BLUE}`, borderRadius: 3, background: 'rgba(47,128,214,0.10)', textAlign: 'center' }}>◆ DEFENCE PLANNING</div>
-          <Section title="1 · REGION / COUNTRIES">
+          <Section title="1 · REGION / COUNTRIES" defaultOpen badge={capCodes.length ? capCodes.length + " sel" : ""}>
             <button onClick={() => setShowCountries(true)} className="f-mono" style={{ width: '100%', fontSize: 10, padding: '7px', border: `1px solid ${BLUE}`, borderRadius: 3, background: 'rgba(47,128,214,0.12)', color: '#fff', cursor: 'pointer', textAlign: 'left' }}>
               ▸ SELECT COUNTRIES ({capCodes.length})
             </button>
@@ -1269,7 +1283,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
             <div className="f-mono" style={{ fontSize: 8, color: MUT, marginTop: 6, lineHeight: 1.4 }}>Selected countries set the map view (the map fits to them) and mark their capitals. Add as many as you like to model the whole region.</div>
           </Section>
-          <Section title="2 · TARGETS TO DEFEND (click map)">
+          <Section title="2 · TARGETS TO DEFEND (click map)" defaultOpen={false} badge={targets.length ? targets.length : ""}>
             <div className="f-mono" style={{ fontSize: 9, color: AMBER, marginBottom: 6, lineHeight: 1.4 }}>
               These are the points you are defending. Click the map to drop one, or add your capitals. The enemy will aim at these.
             </div>
@@ -1299,7 +1313,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             <div className="f-mono" style={{ fontSize: 9, color: targets.length ? GREEN : AMBER, marginTop: 5 }}>{targets.length ? targets.length + ' target(s) set ✓' : 'No targets yet – place at least one.'}</div>
           </Section>
 
-          <Section title="3 · SAM – MISSILE AIR DEFENCE (ракетні ППО)">
+          <Section title="3 · SAM – MISSILE AIR DEFENCE (ракетні ППО)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'sam').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' ? GREEN : MUT, marginBottom: 5 }}>
               {placeKind === 'battery' ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') : 'Guided surface-to-air missile systems. Radars, EW, aircraft, drones and gun groups have their own stages below.'}
             </div>
@@ -1390,7 +1404,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="4 · EW / SIGINT / RADARS (РЕБ / РЕР / радари)">
+          <Section title="4 · EW / SIGINT / RADARS (РЕБ / РЕР / радари)" defaultOpen={false} badge={((batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'radar').length) + (batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'ew').length)) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#8fd0c4', marginBottom: 6, lineHeight: 1.4 }}>
               Detection and electronic warfare. Radars and AWACS only detect (they widen the picture, turning RED unseen tracks GREEN). EW / SIGINT suites soft-kill drones and disrupt links inside their footprint without firing a missile.
             </div>
@@ -1425,6 +1439,29 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               })}
             </div>
             {(() => {
+              const radarLib = libOptions.filter(e => e.cat === 'RADAR');
+              const esmLib = libOptions.filter(e => e.cat === 'ESM');
+              return (
+                <div style={{ marginTop: 8, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
+                  <div className="f-mono" style={{ fontSize: 9, color: '#8fd0c4', marginBottom: 3 }}>RADAR LIBRARY ({radarLib.length})</div>
+                  <select disabled={mapLocked} className="f-mono" value=""
+                    onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
+                    style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3, marginBottom: 6 }}>
+                    <option value="" disabled>Pick a radar…</option>
+                    {radarLib.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km{e.band ? ' · ' + e.band : ''}</option>)}
+                  </select>
+                  <div className="f-mono" style={{ fontSize: 9, color: '#8fd0c4', marginBottom: 3 }}>PASSIVE ESM / SIGINT ({esmLib.length})</div>
+                  <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginBottom: 3, lineHeight: 1.4 }}>Passive stations do not radiate, so an anti-radiation missile cannot find them. Realistically two or more are needed to turn bearings into a track.</div>
+                  <select disabled={mapLocked} className="f-mono" value=""
+                    onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
+                    style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3 }}>
+                    <option value="" disabled>Pick a passive ESM station…</option>
+                    {esmLib.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km</option>)}
+                  </select>
+                </div>
+              );
+            })()}
+            {(() => {
               const ewLib = libOptions.filter(e => e.cat === 'EW');
               return (
                 <div style={{ marginTop: 8, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
@@ -1456,7 +1493,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="5 · AIR PATROL – FIGHTERS (авіація)">
+          <Section title="5 · AIR PATROL – FIGHTERS (авіація)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'fighter').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#c99be0', marginBottom: 6, lineHeight: 1.4 }}>
               Combat air patrol. Fighters fly a patrol route you draw and engage cruise missiles and drones inside their air-to-air reach (never ballistic). When a fighter detects a threat it turns to intercept; its engagement radius travels with it. Speeds and ranges are real-world open-source values.
             </div>
@@ -1503,7 +1540,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="6 · INTERCEPTOR DRONES (дрони-перехоплювачі)">
+          <Section title="6 · INTERCEPTOR DRONES (дрони-перехоплювачі)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'drone').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#7ec8a9', marginBottom: 6, lineHeight: 1.4 }}>
               Interceptor drone teams hunt Shahed-type OWA and reconnaissance UAVs within their reach. Cheap, effective against drones, limited against fast cruise missiles.
             </div>
@@ -1554,7 +1591,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="7 · SMALL FIRE GROUPS – GUNS / MANPADS (малі вогневі групи)">
+          <Section title="7 · SMALL FIRE GROUPS – GUNS / MANPADS (малі вогневі групи)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'guns').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#d0b48f', marginBottom: 6, lineHeight: 1.4 }}>
               Short-range guns, SHORAD and MANPADS teams. The last layer over the target: cheap, dense, effective against low drones and terminal threats, very short reach.
             </div>
@@ -1573,7 +1610,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               })}
             </div>
             {(() => {
-              const gunCats = [{ key: 'GUN_LASER', label: 'Guns/Laser' }, { key: 'MANPADS', label: 'MANPADS' }];
+              const gunCats = [{ key: 'MVG', label: 'Mobile groups' }, { key: 'GUN_LASER', label: 'Guns/Laser' }, { key: 'MANPADS', label: 'MANPADS' }];
               const inGunCat = libOptions.filter(e => e.cat === gunLibCat);
               return (
                 <div style={{ marginTop: 8, opacity: mapLocked ? 0.5 : 1, pointerEvents: mapLocked ? 'none' : 'auto' }}>
@@ -1588,8 +1625,8 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
                   <select disabled={mapLocked} className="f-mono" value=""
                     onChange={e => { addFromLibrary(e.target.value); e.target.value = ''; }}
                     style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3 }}>
-                    <option value="" disabled>Pick a {gunLibCat === 'GUN_LASER' ? 'gun/laser' : 'MANPADS'} system… ({inGunCat.length})</option>
-                    {inGunCat.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km</option>)}
+                    <option value="" disabled>Pick a {gunLibCat === 'GUN_LASER' ? 'gun/laser' : gunLibCat === 'MVG' ? 'mobile fire group' : 'MANPADS'} system… ({inGunCat.length})</option>
+                    {inGunCat.map(e => <option key={e.idx} value={e.idx}>{e.name} ({e.country}) · {e.rangeKm}km{e.altKm ? ' · ceil ' + Math.round(e.altKm * 1000) + 'm' : ''}{e.reactS ? ' · ' + e.reactS + 's' : ''}</option>)}
                   </select>
                 </div>
               );
@@ -1613,7 +1650,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="8 · WEATHER & CONDITIONS">
+          <Section title="8 · WEATHER & CONDITIONS" defaultOpen={false} badge={((SEASONS[season] || {}).label || "") + (night ? " · night" : "")}>
             <div className="f-mono" style={{ fontSize: 9, color: MUT, margin: '0 0 2px' }}>SEASON</div>
             <Select value={season} onChange={setSeason} options={Object.values(SEASONS).map(s => [s.key, `${s.label} (${s.tempC > 0 ? '+' : ''}${s.tempC}°C)`])} />
             <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', margin: '3px 0 6px', lineHeight: 1.4 }}>{(SEASONS[season] || {}).notes}</div>
@@ -1630,7 +1667,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             <div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginTop: 6, lineHeight: 1.4 }}>Low-altitude cruise/OWA leak more (radar horizon); winter degrades guns/drones; jamming hurts track quality.</div>
           </Section>
 
-          <Section title="9 · OPTIONS (advanced)">
+          <Section title="9 · OPTIONS (advanced)" defaultOpen={false} badge={[crewFatigue && "fatigue", coldStart && "cold", centralised && "C2"].filter(Boolean).join(" · ")}>
             <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 6, lineHeight: 1.4 }}>Optional realism factors. Leave defaults for a standard run.</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <label className="f-mono" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 10, color: TEXT, cursor: 'pointer' }}>
@@ -1846,7 +1883,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         {/* ---- right rail (ATTACK): targets + routes + attack matrix + simulate ---- */}
         <div style={{ width: 330, borderLeft: '1px solid #243d52', overflowY: 'auto', padding: 12, background: '#0c1c2e' }}>
           <div className="f-display" style={{ fontSize: 12, color: RED, letterSpacing: '0.08em', padding: '4px 8px', marginBottom: 10, border: `1px solid ${RED}`, borderRadius: 3, background: 'rgba(210,74,68,0.10)', textAlign: 'center' }}>◆ ATTACK PLANNING</div>
-          <Section title="SCENARIO LIBRARY">
+          <Section title="SCENARIO LIBRARY" defaultOpen={false}>
             <button onClick={() => setShowScenarios(true)} className="f-mono" style={{ width: '100%', fontSize: 10, padding: '6px', border: `1px solid ${BLUE}`, borderRadius: 3, background: 'rgba(47,128,214,0.12)', color: '#fff', cursor: 'pointer' }}>▸ SCENARIOS &amp; LIBRARIES</button>
           </Section>
 
@@ -1919,7 +1956,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             </Section>
           </div>
           {enhanced && targets.length > 0 && (
-            <Section title="ENHANCED ROUTES (draw by hand)">
+            <Section title="ENHANCED ROUTES (draw by hand)" defaultOpen={false} badge={customRoutes.length ? customRoutes.length : ""}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                 <button onClick={() => setPlaceKind('route')} className="f-mono" style={{ fontSize: 9, padding: '4px 8px', borderRadius: 3, border: `1px solid ${placeKind === 'route' ? '#e8bd55' : '#34516b'}`, background: placeKind === 'route' ? 'rgba(217,165,47,0.2)' : 'transparent', color: placeKind === 'route' ? '#fff' : MUT, cursor: 'pointer' }}>{placeKind === 'route' ? '▶ DRAWING ON MAP' : 'DRAW MODE'}</button>
                 <button onClick={addCustomRoute} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', border: '1px solid #4f9d77', borderRadius: 3, background: 'rgba(79,157,119,0.14)', color: GREEN, cursor: 'pointer' }}>+ NEW ROUTE</button>
@@ -2267,7 +2304,24 @@ const btn = (c) => ({ fontSize: 11, padding: '7px 12px', border: `1px solid ${c}
 const actBtn = (c, dis) => ({ flex: 1, fontSize: 12, padding: '10px', border: `1px solid ${c}`, borderRadius: 3, background: dis ? '#16293c' : 'rgba(47,128,214,0.10)', color: dis ? MUT : '#fff', cursor: dis ? 'not-allowed' : 'pointer', letterSpacing: '0.03em' });
 const miniIn = { width: '100%', fontSize: 10, padding: '4px 3px', background: '#0a1626', border: '1px solid #243d52', color: '#dde3ea', borderRadius: 3 };
 function MiniField({ label, children }) { return <div><div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginBottom: 1 }}>{label}</div>{children}</div>; }
-function Section({ title, children }) { return <div style={{ marginBottom: 16 }}><div className="f-mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: '#56a0e0', borderBottom: '1px solid #243d52', paddingBottom: 3, marginBottom: 8 }}>{title}</div>{children}</div>; }
+// Collapsible planning stage. Collapsed stages still show a badge summarising
+// what is inside them, so the rail reads as a checklist at a glance.
+function Section({ title, children, defaultOpen = true, badge = null }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: open ? 16 : 6 }}>
+      <button onClick={() => setOpen(o => !o)} className="f-mono"
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left', fontSize: 9, letterSpacing: '0.12em', color: open ? '#56a0e0' : '#7e93a8', borderBottom: '1px solid #243d52', borderTop: 'none', borderLeft: 'none', borderRight: 'none', background: 'transparent', paddingBottom: 3, marginBottom: open ? 8 : 0, cursor: 'pointer' }}>
+        <span style={{ fontSize: 8, width: 8, flexShrink: 0, transition: 'transform 120ms', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none' }}>▶</span>
+        <span style={{ flex: 1 }}>{title}</span>
+        {badge != null && badge !== '' && (
+          <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 8, border: '1px solid #34516b', background: '#16293c', color: '#93a1b0', flexShrink: 0, letterSpacing: 0 }}>{badge}</span>
+        )}
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
 function SyncMatrix({ matrix, targets, onShift }) {
   const ORI = {}; THREAT_ORIGINS.forEach(o => { ORI[o.id] = o; });
