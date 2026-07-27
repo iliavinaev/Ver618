@@ -5,7 +5,114 @@ import { JATEC_LOGO, PM_LOGO, AURELIA_SAT } from './jatecLogo.js';
 import L from 'leaflet';
 import { AD_LIBRARY, AD_CATEGORIES } from './data/airDefense';
 import { OFFENSIVE_LIBRARY, OFFENSIVE_CATEGORIES } from './data/offensiveSystems';
+import * as XLSX from 'xlsx';
 import OperationalPlan from './OperationalPlan.jsx';
+
+// ============================================================================
+// UNIFIED LIBRARY WORKBOOK
+// The defence and offensive catalogues have different native shapes. For an
+// Excel round-trip both are flattened onto one common column set, so a single
+// workbook holds the whole reference base and can be edited in Excel and read
+// back. Unknown columns are ignored on import; missing ones are simply blank.
+// ============================================================================
+const LIB_COLUMNS = [
+  'side', 'category', 'family', 'name', 'country', 'manufacturer', 'class',
+  'range_km', 'range_text', 'altitude_km', 'altitude_text', 'speed_text',
+  'armament', 'guidance', 'launchers', 'per_launcher', 'radar', 'cost',
+  'threat_class', 'available', 'notes',
+];
+// flatten a native library entry onto the shared column set
+function libRowFromEntry(e, side) {
+  const isDef = side === 'DEFENCE';
+  return {
+    side,
+    category: (isDef ? e.cat : e.category || e.tab) || '',
+    family: e.family || '',
+    name: e.name || '',
+    country: e.country || e.nation || '',
+    manufacturer: e.mfr || '',
+    class: e.cls || e.type || '',
+    range_km: e.rangeKm != null ? e.rangeKm : '',
+    range_text: e.rangeText || '',
+    altitude_km: e.altKm != null ? e.altKm : '',
+    altitude_text: e.altText || e.ceilText || '',
+    speed_text: e.speedText || '',
+    armament: e.missile || e.armament || e.warhead || '',
+    guidance: e.guidance || '',
+    launchers: e.launchers != null ? e.launchers : '',
+    per_launcher: e.perLauncher != null ? e.perLauncher : '',
+    radar: e.radar || '',
+    cost: e.cost || e.costMissile || e.sysCost || '',
+    threat_class: e.threatClass || '',
+    available: isDef ? (e.deployable === false ? 'no' : 'yes') : (e.usable === false ? 'no' : 'yes'),
+    notes: e.notes || '',
+  };
+}
+// rebuild a native entry from a spreadsheet row
+function entryFromLibRow(row, side) {
+  const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
+  const name = String(row.name || '').trim();
+  if (!name) return null;
+  const common = {
+    family: String(row.family || name).trim(),
+    name,
+    country: String(row.country || '').trim(),
+    mfr: String(row.manufacturer || '').trim(),
+    cls: String(row.class || '').trim(),
+    rangeKm: num(row.range_km),
+    rangeText: String(row.range_text || '').trim(),
+    altKm: num(row.altitude_km),
+    altText: String(row.altitude_text || '').trim(),
+    speedText: String(row.speed_text || '').trim(),
+    guidance: String(row.guidance || '').trim(),
+    cost: String(row.cost || '').trim(),
+    notes: String(row.notes || '').trim(),
+  };
+  if (side === 'DEFENCE') {
+    return {
+      ...common,
+      cat: String(row.category || 'SAM').trim().toUpperCase().replace(/[^A-Z_]/g, '_') || 'SAM',
+      missile: String(row.armament || '').trim(),
+      launchers: num(row.launchers),
+      perLauncher: num(row.per_launcher),
+      radar: String(row.radar || '').trim(),
+      deployable: String(row.available || 'yes').toLowerCase() !== 'no',
+    };
+  }
+  return {
+    ...common,
+    category: String(row.category || '').trim(),
+    warhead: String(row.armament || '').trim(),
+    threatClass: String(row.threat_class || '').trim(),
+    usable: String(row.available || 'yes').toLowerCase() !== 'no',
+  };
+}
+function exportLibraryWorkbook(customDef, customOff) {
+  const def = [...AD_LIBRARY, ...(customDef || [])].map(e => libRowFromEntry(e, 'DEFENCE'));
+  const off = [...OFFENSIVE_LIBRARY, ...(customOff || [])].map(e => libRowFromEntry(e, 'OFFENSIVE'));
+  const readme = [
+    { field: 'PURPOSE', meaning: 'Unified SKYWATCH reference libraries. Edit here, then import the file back into the tool.' },
+    { field: 'HOW TO ADD', meaning: 'Add rows to the DEFENCE or OFFENSIVE sheet. Only "name" is mandatory. On import, rows whose name already exists are skipped.' },
+    { field: 'side', meaning: 'DEFENCE or OFFENSIVE. Set automatically per sheet.' },
+    { field: 'category', meaning: 'DEFENCE: SAM, MANPADS, GUN_LASER, MVG, INTERCEPTOR, RADAR, ESM, EW (RED_* rows are enemy reference and are never placeable). OFFENSIVE: the threat grouping.' },
+    { field: 'range_km', meaning: 'Numeric. For a weapon this is engagement range; for a radar or ESM station it is detection range; for a threat it is flight range.' },
+    { field: 'altitude_km', meaning: 'Numeric ceiling. For mobile fire groups this is the hard altitude gate that decides whether a high-flying drone can be engaged at all.' },
+    { field: 'armament', meaning: 'Missile, gun or warhead description.' },
+    { field: 'available', meaning: 'yes or no. "no" marks a reference-only entry that cannot be placed.' },
+    { field: 'CAUTION', meaning: 'All values are illustrative open-source estimates, not validated operational analysis.' },
+  ];
+  const wb = XLSX.utils.book_new();
+  const mk = (rows, cols) => {
+    const ws = XLSX.utils.json_to_sheet(rows, cols ? { header: cols } : undefined);
+    ws['!cols'] = (cols || Object.keys(rows[0] || {})).map(c => ({ wch: c === 'notes' ? 60 : c === 'name' || c === 'family' ? 26 : 14 }));
+    return ws;
+  };
+  XLSX.utils.book_append_sheet(wb, mk(readme), 'README');
+  XLSX.utils.book_append_sheet(wb, mk(def, LIB_COLUMNS), 'DEFENCE');
+  XLSX.utils.book_append_sheet(wb, mk(off, LIB_COLUMNS), 'OFFENSIVE');
+  XLSX.writeFile(wb, 'skywatch-libraries.xlsx');
+}
+
 
 // ============================================================================
 // SKYWATCH/6.0, Brigade Air Defense Operations
@@ -2790,7 +2897,8 @@ function AppInner() {
   return (
     <div className="min-h-screen w-full" style={{ background: '#102234', color: '#dde3ea' }}>
       <RisoStyles />
-      {view === 'menu' && <MenuScreen onDemo={startDemo} onTraining={goTraining} onModelling={() => setView('modelling')} onLibrary={() => setView('library')} audioOn={audioOn} setAudioOn={setAudioOn} />}
+      {view === 'menu' && <MenuScreen onDemo={startDemo} onTraining={goTraining} onModelling={() => setView('modelling')} onLibrary={() => setView('library')} onMethodology={() => setView('methodology')} audioOn={audioOn} setAudioOn={setAudioOn} />}
+      {view === 'methodology' && <MethodologyScreen onBack={() => setView('menu')} />}
       {view === 'library' && <LibraryScreen onBack={() => setView('menu')} />}
       {view === 'trainmenu' && <TrainingHubScreen onSingle={start} onMultiplayer={() => setView('mp_lobby')} onInstructor={startInstructor} onBack={() => setView('menu')} />}
       {view === 'mp_lobby' && (
@@ -3406,7 +3514,200 @@ function LobbyScenarioBuilder({ scenario, onSet }) {
   );
 }
 
-function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, audioOn, setAudioOn }) {
+// ============================================================================
+// METHODOLOGY & MATHEMATICS
+// A standalone reference tab: how to drive the tool, and exactly what the
+// engine computes. Every formula below is the one actually used in the code.
+// ============================================================================
+function Formula({ children }) {
+  return (
+    <pre className="f-mono" style={{ fontSize: 11, lineHeight: 1.6, color: '#cdd6e0', background: '#0a1626', border: '1px solid #243d52', borderRadius: 4, padding: '10px 12px', margin: '8px 0', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>{children}</pre>
+  );
+}
+function MBlock({ n, title, children }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div className="f-display" style={{ fontSize: 17, color: '#d9a52f', marginBottom: 6 }}>
+        <span style={{ color: '#5d6b7a', fontSize: 13 }}>{n}</span> {title}
+      </div>
+      <div className="f-serif" style={{ fontSize: 13.5, lineHeight: 1.65, color: '#dde3ea' }}>{children}</div>
+    </div>
+  );
+}
+function MethodologyScreen({ onBack }) {
+  const [tab, setTab] = React.useState('how'); // 'how' | 'math' | 'limits'
+  const TABS = [['how', 'HOW TO USE IT'], ['math', 'THE MATHEMATICS'], ['limits', 'LIMITS & PROVENANCE']];
+  return (
+    <div className="min-h-screen riso-paper p-6">
+      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="max-w-3xl mx-auto pt-4">
+        <button onClick={onBack} className="btn-riso btn-alt mb-4" style={{ padding: '6px 14px', fontSize: 12 }}>‹ BACK</button>
+        <h1 className="f-display" style={{ fontSize: 34, lineHeight: 1, letterSpacing: '0.05em', color: '#2f80d6' }}>METHODOLOGY</h1>
+        <div className="f-mono text-[11px] mt-1 mb-4" style={{ color: '#93a1b0' }}>HOW THE TOOL IS DRIVEN AND WHAT THE ENGINE COMPUTES</div>
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          {TABS.map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} className="f-display"
+              style={{ fontSize: 12, padding: '6px 14px', border: `2px solid ${tab === k ? '#2f80d6' : '#243d52'}`, borderRadius: 4, background: tab === k ? '#2f80d6' : 'transparent', color: tab === k ? '#0a1626' : '#dde3ea', cursor: 'pointer' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'how' && (
+          <div>
+            <MBlock n="1" title="Build the defence, in stages">
+              The left rail is a checklist. Each stage collapses; the badge on a closed stage tells you what is already in it.
+              <ul style={{ margin: '8px 0 0 16px', listStyle: 'disc' }}>
+                <li><strong>Region.</strong> Pick the countries to model. The map fits to them.</li>
+                <li><strong>Targets.</strong> Click the map to place what you are defending. Type sets hit points and value.</li>
+                <li><strong>SAM.</strong> Guided missile systems, quick picks plus the full SAM library.</li>
+                <li><strong>EW / SIGINT / radars.</strong> Sensors detect but never fire. Passive stations cannot be found by anti-radiation missiles. EW soft-kills drones without spending a round.</li>
+                <li><strong>Air patrol.</strong> Place a fighter, then draw its patrol route. It flies the route and turns to intercept what it detects.</li>
+                <li><strong>Interceptor drones</strong> and <strong>small fire groups</strong> are the cheap inner layers.</li>
+                <li><strong>Weather</strong> and <strong>options</strong> set season, visibility, wind, night, jamming and the optional realism factors.</li>
+              </ul>
+            </MBlock>
+            <MBlock n="2" title="Compose the attack">
+              The right rail has two modes. <strong>Simple</strong> picks a threat, a direction, a target and a count, and routes it automatically. <strong>Enhanced</strong> lets you draw the route by hand with an altitude per waypoint; dropping a waypoint near a target snaps it exactly onto that target.
+              Ballistic and hypersonic weapons cannot be routed by hand: they fly a fixed trajectory, so you set an aim point and one launch point.
+              Waves stack, each with its own start time from H-hour and spacing between rounds.
+            </MBlock>
+            <MBlock n="3" title="Lock, run, read">
+              <strong>LOCK MAP + RINGS</strong> freezes the laydown. <strong>START</strong> runs it. Playback speed only changes how fast you watch: 1x is real time, and the physics is identical at every speed.
+              During the run a track is drawn <span style={{ color: '#4f9d77' }}>green when at least one radar holds it</span> and <span style={{ color: '#d24a44' }}>red when nothing can see it</span>, so leakers are obvious.
+              <strong> MONTE-CARLO</strong> repeats the same plan many times with different random draws and reports means with 95% confidence intervals: use it for any conclusion, not a single run.
+            </MBlock>
+            <MBlock n="4" title="Reading the report honestly">
+              Intercept rate is kills over total tracks, including decoys. Protection is measured against threats that actually resolved. If a raid is still airborne when the time limit is reached, those tracks are reported separately as unresolved and are never counted as hits.
+              Cost exchange compares the value you destroyed with what you spent to do it; winning on kills while losing on exchange is still a bad plan.
+            </MBlock>
+          </div>
+        )}
+
+        {tab === 'math' && (
+          <div>
+            <MBlock n="1" title="Determinism and time">
+              The engine is a pure function of the plan and a seed. The same plan with the same seed produces a byte-identical result, which is what makes Monte-Carlo meaningful and lets you compare two laydowns fairly.
+              Randomness comes from a seeded generator (mulberry32), never from the system clock. Simulation time advances in fixed steps; playback speed is a display accelerator only.
+            </MBlock>
+
+            <MBlock n="2" title="Detection: the radar horizon">
+              Detection is computed separately from engagement. A battery cannot fire at what it does not hold, which is why low-flying cruise missiles leak past long-range systems.
+              The geometric horizon between a mast and a target is
+              <Formula>{`d_horizon (km) = 4.12 · ( √h_mast(m) + √h_target(m) )`}</Formula>
+              A mast at 30 m sees a target at 100 m out to about 64 km, but the same mast sees a 50 m sea-skimmer at only about 52 km. An airborne radar has an effective mast of several thousand metres, which is why fighters and AWACS see low movers so much further.
+              The usable detection range is the smaller of the system's rated range and this horizon.
+            </MBlock>
+
+            <MBlock n="3" title="Track quality">
+              How well a threat is held drives the shot. Quality rises with the number of sensors on it and falls for low fliers and under jamming:
+              <Formula>{`q = 0.72 + 0.12 · min(3, n_sensors)
+    − 0.14  if the track is terrain-following
+    − 0.05  if the track is low
+    − 0.14  if jammed
+q = clamp(q, 0.45, 1.08)`}</Formula>
+              One sensor gives about 0.84; three or more give about 1.08. This is the mechanism by which adding a radar improves the kill rate of batteries that were already in range.
+            </MBlock>
+
+            <MBlock n="4" title="The kill-probability chain">
+              A single shot's probability is the system's base figure against that threat class, multiplied by everything that degrades it:
+              <Formula>{`pk = basePk
+   × weather
+   × crosswind × icing × temperature   (optically guided systems only)
+   × trackQuality(n_sensors, altitude, jamming)
+   × crewFatigue
+   × saturation
+   × reliability
+pk = clamp(pk, 0, 0.98)`}</Formula>
+              Nothing ever reaches certainty: the 0.98 ceiling stands in for the residual failures no model captures.
+            </MBlock>
+
+            <MBlock n="5" title="Salvo">
+              Firing more than one round at the same track is treated as independent attempts:
+              <Formula>{`Pk_salvo = 1 − (1 − pk)^shots`}</Formula>
+              Two shots at pk 0.6 give 0.84, not 1.2. This is why a shoot-shoot doctrine burns inventory fast for diminishing returns, and the effect is visible in the cost-exchange line of the report.
+            </MBlock>
+
+            <MBlock n="6" title="Saturation">
+              A battery can only guide so many engagements at once. Beyond its channel count, quality degrades:
+              <Formula>{`saturation = 1                      if tracks ≤ channels
+           = max(0.45, 1 − 0.10 · (tracks − channels))`}</Formula>
+              Channels come from the launcher count you set per battery. This is the mathematical core of a saturation raid: the attacker does not need to defeat the missile, only the number of things it can shoot at simultaneously.
+            </MBlock>
+
+            <MBlock n="7" title="Crew fatigue (optional)">
+              Over a long engagement, performance decays:
+              <Formula>{`fatigue = 1 − min(0.22, max(0, (hours − 2) · 0.045))`}</Formula>
+              Flat for the first two hours, then falling to a floor of about 0.78. It is a switch in the options stage, so you can compare a fresh crew against a fatigued one directly.
+            </MBlock>
+
+            <MBlock n="8" title="Threat kinematics">
+              Threats fly real trajectories rather than sliding along a line.
+              <strong> Turn radius</strong> follows from speed and the sustained g the airframe can pull:
+              <Formula>{`R = V² / (g · n)        g = 9.81 m/s²`}</Formula>
+              A cruise missile at 800 km/h pulling 5 g turns in about 1.0 km; a Shahed at 185 km/h pulling 2.5 g needs about 0.1 km, but its low speed leaves it exposed far longer.
+              <strong> Terminal phase:</strong> most threats accelerate and descend onto the target, so speed changes over the flight (a Shahed dives at roughly 1.6 times its cruise speed).
+              <strong> Ballistic tracks</strong> fly a depressed arc. While the warhead is in flight the Earth turns beneath it, so the ground track bows sideways:
+              <Formula>{`f  = 2 · Ω · sin(latitude)          Ω = 7.292e-5 rad/s
+d  = ½ · f · V · t²                (lateral deflection)`}</Formula>
+              Guidance corrects the impact point, so the arc bows but the target is still hit. It matters because the bowed path crosses different radar coverage than a straight line would.
+            </MBlock>
+
+            <MBlock n="9" title="Command and information delay">
+              Between holding a track and launching, every battery waits:
+              <Formula>{`delay = reaction_time + C2_delay`}</Formula>
+              Roughly 10 s for a large SAM, 7 s for a medium system, 4 s for a gun, 6 s for a fighter once cued. Centralised command and a cold start add more. During the delay the threat keeps closing, which converts time directly into distance and sometimes into a leaker.
+              Point-defence systems that are themselves under attack bypass the chain: self-defence engagements are automatic, with a modest accuracy bonus.
+            </MBlock>
+
+            <MBlock n="10" title="SEAD, DEAD and attrition">
+              Air-defence sites are targetable. Each has hit points by class, and a site at zero is disabled: its radar goes off and it stops firing, which reopens the corridor it was covering. This is the mechanism to test whether a laydown is resilient or merely dense.
+            </MBlock>
+
+            <MBlock n="11" title="Monte-Carlo and confidence">
+              A single run is one draw from a distribution. The batch mode repeats the identical plan with different seeds and reports mean, standard deviation, a 95% confidence interval and the 10th, 50th and 90th percentiles.
+              <Formula>{`CI₉₅ = mean ± 1.96 · σ / √N`}</Formula>
+              If two laydowns have overlapping intervals, the difference between them is not established, however different the single runs looked.
+            </MBlock>
+
+            <MBlock n="12" title="Cost exchange">
+              Every intercept has a price and every threat has a value:
+              <Formula>{`exchange = value destroyed / cost of the defence spend`}</Formula>
+              An exchange below 1 means the defence spent more than it saved. Against cheap mass this is the decisive metric, and it is the reason the cheap layers exist at all.
+            </MBlock>
+          </div>
+        )}
+
+        {tab === 'limits' && (
+          <div>
+            <MBlock n="1" title="What this is">
+              A transparent, deterministic model for reasoning about air-defence laydowns and attack composition. Its value is in the relationships it makes visible: horizon against altitude, delay against closing speed, channels against raid size, cost against mass.
+            </MBlock>
+            <MBlock n="2" title="What the numbers are">
+              Every system figure comes from open sources: manufacturer material, public reference works and published analysis, normalised for internal consistency. They are illustrative and are <strong>not</strong> validated operational analysis, not intelligence, and not suitable for operational planning. Where a real figure is classified or disputed, a plausible open value is used.
+            </MBlock>
+            <MBlock n="3" title="What is not modelled">
+              <ul style={{ margin: '4px 0 0 16px', listStyle: 'disc' }}>
+                <li>Terrain masking and multipath; the horizon is geometric only.</li>
+                <li>Detailed seeker physics, countermeasures and ECCM duels.</li>
+                <li>Communications architecture beyond a single lumped delay per battery.</li>
+                <li>Logistics and resupply beyond a per-battery reload timer.</li>
+                <li>Human decision making: engagement doctrine is a rule set you configure, not an operator.</li>
+              </ul>
+            </MBlock>
+            <MBlock n="4" title="How to use results responsibly">
+              Compare, do not predict. The tool is sound for asking whether laydown A leaks more than laydown B under the same attack, and unsound for claiming a specific intercept percentage against a real raid. Always run Monte-Carlo before concluding anything, and quote the interval rather than the mean.
+            </MBlock>
+          </div>
+        )}
+      </div>
+      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+    </div>
+  );
+}
+
+function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, onMethodology, audioOn, setAudioOn }) {
   const [info, setInfo] = React.useState(null); // 'prov' | 'facil' | null
   return (
     <div className="min-h-screen riso-paper p-6">
@@ -3441,58 +3742,6 @@ function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, audioOn, setAu
         </div>
         <div className="double-rule mt-4 mb-6" />
 
-        <div className="border-t-2 border-b-2 border-[#243d52] py-4 mb-6 f-serif">
-          <div className="f-display text-2xl mb-2" style={{ color: '#d9a52f' }}>HOW THIS WORKS</div>
-          <p className="text-[14px] leading-relaxed">
-            Build a picture on a real-world map: place the targets you are defending, position air-defence batteries, then compose the attack, drones, cruise, ballistic and hypersonic threats, from chosen directions or hand-drawn routes. Run the simulation and watch it play out in real time, or run a Monte-Carlo batch for statistics with confidence intervals.
-            The engine is physics-based and deterministic: radar horizon, turn radius, terminal dive, command-and-information delay, saturation and interceptor economics all feed the result.
-            <strong> Relationships are sound; the numbers are illustrative and open-source, not validated operational analysis.</strong>
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="border-2 border-[#243d52] p-4">
-            <div className="f-display text-xl mb-2" style={{ color: '#d9a52f' }}>WHAT YOU MODEL</div>
-            <ul className="f-serif text-[13px] space-y-1.5">
-              <li>› <strong>Region.</strong> Pick any countries to model, from a single capital to the whole of Europe; the map fits to them.</li>
-              <li>› <strong>Targets &amp; laydown.</strong> Place the points you defend and position SAM, SHORAD, guns, EW and interceptor crews by hand.</li>
-              <li>› <strong>The attack.</strong> Choose direction, type and count for automatic routing, or draw exact routes with per-waypoint altitude.</li>
-              <li>› <strong>System behaviour.</strong> Set engage classes, missile variants, launcher counts, command delay and self-defence per battery.</li>
-              <li>› <strong>SEAD / DEAD.</strong> Target the air-defence sites themselves; batteries take damage and can be disabled.</li>
-              <li>› <strong>Analysis.</strong> Single deterministic run or Monte-Carlo with intercept, leakage and cost-exchange statistics.</li>
-            </ul>
-          </div>
-          <div className="border-2 border-[#243d52] p-4" style={{ background: 'rgba(210,74,68,0.04)' }}>
-            <div className="f-display text-xl mb-2" style={{ color: '#d9a52f' }}>MODELLED LAYERS</div>
-            <p className="f-serif text-[12px] leading-snug">
-              <strong style={{ color: '#2f80d6' }}>UPPER TIER:</strong><br/>
-              Patriot PAC-3 · SAMP/T · IRIS-T SLM, ballistic &amp; cruise<br/><br/>
-              <strong>AREA / POINT SAM:</strong><br/>
-              NASAMS · IRIS-T · CAMM · Crotale-NG<br/><br/>
-              <strong>SHORAD, GUNS &amp; MANPADS:</strong><br/>
-              Gepard · Skynex · Stinger · Piorun<br/><br/>
-              <strong style={{ color: '#2f80d6' }}>C-UAS &amp; EW:</strong><br/>
-              Mobile fire groups · drone-interceptor crews · EW suite<br/><br/>
-              <strong style={{ color: '#c99be0' }}>COMBAT AIR PATROL &amp; SENSORS:</strong><br/>
-              F-16 · Eurofighter · F-35 (A2A) · ground radar · AWACS
-            </p>
-            <p className="f-serif text-[12px] mt-3" style={{ color: '#d24a44' }}>
-              <strong>The core dilemma:</strong> few interceptors, many threats, decoys baiting your missiles. Conserve rounds for the ballistic window while protecting what matters.
-            </p>
-          </div>
-        </div>
-
-        <div className="border-2 border-[#243d52] p-3 mb-6" style={{ background: 'rgba(47,128,214,0.04)' }}>
-          <div className="f-display text-base mb-1" style={{ color: '#2f80d6' }}>THREATS YOU CAN COMPOSE</div>
-          <p className="f-serif text-[11px] leading-snug">
-            <strong> Emission decoys</strong> (Gerbera-type) to overload the picture ·
-            <strong> mass one-way attack UAV</strong> (Shahed / Geran-2, jet Geran) from multiple axes ·
-            <strong> cruise missiles</strong> (Kh-101, Kalibr) on low-altitude routes ·
-            <strong> ballistic &amp; hypersonic</strong> (Iskander-M, Kinzhal, Oreshnik with MIRV).
-            All system parameters, routes and positions are illustrative and drawn from open sources.
-          </p>
-        </div>
-
         <button onClick={onModelling}
           className="text-left p-5 border-2 transition-colors w-full"
           style={{ borderColor: '#d9a52f', background: 'rgba(217,165,47,0.06)' }}>
@@ -3507,6 +3756,14 @@ function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, audioOn, setAu
           <div className="f-display text-2xl mb-1" style={{ color: '#5aa0e6' }}>SYSTEMS LIBRARY ></div>
           <div className="f-mono text-[12px]" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
             Reference catalogue, two sides. DEFENCE: NATO and partner air defence (SAM, MANPADS, guns &amp; lasers, interceptor drones, EW). OFFENSIVE: threats (ballistic, cruise, glide bombs, OWA / loitering, recon, UCAV). Open-source characteristics plus the calibrated in-model profile. Edit parameters for the session or import your own libraries.
+          </div>
+        </button>
+        <button onClick={onMethodology}
+          className="text-left p-5 border-2 transition-colors mt-4 w-full"
+          style={{ borderColor: '#4f9d77', background: 'rgba(79,157,119,0.06)' }}>
+          <div className="f-display text-2xl mb-1" style={{ color: '#4f9d77' }}>METHODOLOGY &amp; INSTRUCTIONS &gt;</div>
+          <div className="f-mono text-[12px]" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
+            How to drive the tool, and exactly what the engine computes: radar horizon, track quality, the kill-probability chain, salvo and saturation, kinematics, command delay, Monte-Carlo confidence and cost exchange. Every formula shown is the one used in the code, with an honest statement of limits.
           </div>
         </button>
         <div className="flex items-center gap-3 mt-4 flex-wrap">
@@ -3677,6 +3934,7 @@ function LibraryScreen({ onBack }) {
   const [editingKey, setEditingKey] = useState(null);
   const [adding, setAdding] = useState(false);
   const fileRef = useRef(null);
+  const xlsxRef = useRef(null);
   const custom = side === 'defence' ? customDef : customOff;
   const setCustom = side === 'defence' ? setCustomDef : setCustomOff;
   const baseLib = side === 'defence' ? AD_LIBRARY : OFFENSIVE_LIBRARY;
@@ -3726,6 +3984,48 @@ function LibraryScreen({ onBack }) {
     r.readAsText(f);
   }
 
+  // ---- Excel round-trip: one workbook holds both libraries ----
+  function onImportXlsx(ev) {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      let wb;
+      try { wb = XLSX.read(new Uint8Array(r.result), { type: 'array' }); }
+      catch (err) { window.alert('Import failed: this does not look like a readable workbook.'); return; }
+      const sheetName = side === 'defence' ? 'DEFENCE' : 'OFFENSIVE';
+      // accept the matching sheet, or a single-sheet file the user built themselves
+      const ws = wb.Sheets[sheetName]
+        || wb.Sheets[wb.SheetNames.find(n => n.toUpperCase() === sheetName)]
+        || (wb.SheetNames.length === 1 ? wb.Sheets[wb.SheetNames[0]] : null);
+      if (!ws) { window.alert('Import failed: no "' + sheetName + '" sheet in this workbook. Export a template first to see the expected columns.'); return; }
+      let rows;
+      try { rows = XLSX.utils.sheet_to_json(ws, { defval: '' }); }
+      catch (err) { window.alert('Import failed: could not read the rows.'); return; }
+      if (!rows.length) { window.alert('Nothing imported: the ' + sheetName + ' sheet is empty.'); return; }
+      const seen = new Set([...baseLib, ...custom].map(e => (e.name || '').toLowerCase()));
+      const added = []; let skipped = 0, unnamed = 0;
+      rows.forEach(row => {
+        const e = entryFromLibRow(row, side === 'defence' ? 'DEFENCE' : 'OFFENSIVE');
+        if (!e) { unnamed++; return; }
+        const nm = e.name.toLowerCase();
+        if (seen.has(nm)) { skipped++; return; }
+        seen.add(nm);
+        added.push({ ...e, _custom: true, _id: 'c' + Date.now() + Math.floor(Math.random() * 100000) });
+      });
+      if (!added.length) {
+        window.alert('Nothing new imported. ' + skipped + ' row(s) already present' + (unnamed ? ', ' + unnamed + ' row(s) had no name' : '') + '.');
+        return;
+      }
+      persist([...custom, ...added]);
+      window.alert('Imported ' + added.length + ' system(s) into the ' + side + ' library on this device.'
+        + (skipped ? '\n' + skipped + ' already present, skipped.' : '')
+        + (unnamed ? '\n' + unnamed + ' row(s) had no name, skipped.' : ''));
+    };
+    r.readAsArrayBuffer(f);
+  }
+
   const btn = (label, onClick, color) => (
     <button onClick={onClick} className="f-display text-[11px] px-3 h-9 border-2"
       style={{ borderColor: color, color: color, background: 'transparent', borderRadius: 4 }}>{label}</button>
@@ -3749,10 +4049,13 @@ function LibraryScreen({ onBack }) {
             style={{ borderColor: '#d24a44', background: side === 'offensive' ? '#d24a44' : 'transparent', color: side === 'offensive' ? '#0a1626' : '#d24a44', borderRadius: 4 }}>OFFENSIVE (THREAT)</button>
           <span style={{ flex: 1 }} />
           {btn('+ ADD SYSTEM', () => setAdding(true), '#2f80d6')}
-          {btn('IMPORT', () => fileRef.current && fileRef.current.click(), '#5aa0e6')}
-          {btn('EXPORT', exportLib, '#5aa0e6')}
+          {btn('IMPORT JSON', () => fileRef.current && fileRef.current.click(), '#5aa0e6')}
+          {btn('EXPORT JSON', exportLib, '#5aa0e6')}
+          {btn('IMPORT XLSX', () => xlsxRef.current && xlsxRef.current.click(), '#4f9d77')}
+          {btn('EXPORT XLSX', () => exportLibraryWorkbook(customDef, customOff), '#4f9d77')}
           {custom.length > 0 && btn('RESET (' + custom.length + ')', resetCustom, '#93a1b0')}
           <input ref={fileRef} type="file" accept="application/json,.json" onChange={onImportFile} style={{ display: 'none' }} />
+          <input ref={xlsxRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onImportXlsx} style={{ display: 'none' }} />
         </div>
         <div className="double-rule mb-4" />
         {side === 'defence'

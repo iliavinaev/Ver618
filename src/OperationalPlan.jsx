@@ -1313,7 +1313,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             <div className="f-mono" style={{ fontSize: 9, color: targets.length ? GREEN : AMBER, marginTop: 5 }}>{targets.length ? targets.length + ' target(s) set ✓' : 'No targets yet – place at least one.'}</div>
           </Section>
 
-          <Section title="3 · SAM – MISSILE AIR DEFENCE (ракетні ППО)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'sam').length) || ""}>
+          <Section title="3 · SAM – MISSILE AIR DEFENCE" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'sam').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: placeKind === 'battery' ? GREEN : MUT, marginBottom: 5 }}>
               {placeKind === 'battery' ? '▶ CLICK THE MAP to place ' + ((allDefs[placeMode] || {}).tag || (allDefs[placeMode] || {}).name || 'a battery') : 'Guided surface-to-air missile systems. Radars, EW, aircraft, drones and gun groups have their own stages below.'}
             </div>
@@ -1404,7 +1404,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="4 · EW / SIGINT / RADARS (РЕБ / РЕР / радари)" defaultOpen={false} badge={((batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'radar').length) + (batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'ew').length)) || ""}>
+          <Section title="4 · EW / SIGINT / RADARS" defaultOpen={false} badge={((batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'radar').length) + (batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'ew').length)) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#8fd0c4', marginBottom: 6, lineHeight: 1.4 }}>
               Detection and electronic warfare. Radars and AWACS only detect (they widen the picture, turning RED unseen tracks GREEN). EW / SIGINT suites soft-kill drones and disrupt links inside their footprint without firing a missile.
             </div>
@@ -1493,7 +1493,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="5 · AIR PATROL – FIGHTERS (авіація)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'fighter').length) || ""}>
+          <Section title="5 · AIR PATROL – FIGHTERS" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'fighter').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#c99be0', marginBottom: 6, lineHeight: 1.4 }}>
               Combat air patrol. Fighters fly a patrol route you draw and engage cruise missiles and drones inside their air-to-air reach (never ballistic). When a fighter detects a threat it turns to intercept; its engagement radius travels with it. Speeds and ranges are real-world open-source values.
             </div>
@@ -1540,7 +1540,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="6 · INTERCEPTOR DRONES (дрони-перехоплювачі)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'drone').length) || ""}>
+          <Section title="6 · INTERCEPTOR DRONES" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'drone').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#7ec8a9', marginBottom: 6, lineHeight: 1.4 }}>
               Interceptor drone teams hunt Shahed-type OWA and reconnaissance UAVs within their reach. Cheap, effective against drones, limited against fast cruise missiles.
             </div>
@@ -1591,7 +1591,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             )}
           </Section>
 
-          <Section title="7 · SMALL FIRE GROUPS – GUNS / MANPADS (малі вогневі групи)" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'guns').length) || ""}>
+          <Section title="7 · SMALL FIRE GROUPS – GUNS / MANPADS" defaultOpen={false} badge={(batteries.filter(b => systemSlot(allDefs[b.type] || {}) === 'guns').length) || ""}>
             <div className="f-mono" style={{ fontSize: 8, color: '#d0b48f', marginBottom: 6, lineHeight: 1.4 }}>
               Short-range guns, SHORAD and MANPADS teams. The last layer over the target: cheap, dense, effective against low drones and terminal threats, very short reach.
             </div>
