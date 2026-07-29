@@ -75,7 +75,10 @@ export function canEngage(def, family, batt) {
 //          origins:{id->{lat,lng}}, bounds:{n,s,w,e},
 //          env:{season,night,coldStart,centralised,jamming,windKmh,wxPreset,salvoKey},
 //          weather, costForType(type,family) }
-export function initSim(plan, seed) {
+export function initSim(plan, seed, opts) {
+  // The event log is instrumentation for a single visual run and its debrief.
+  // Monte-Carlo runs hundreds of sims, so it is off unless explicitly asked for.
+  const logging = !!(opts && opts.log);
   const rng = makeRng(seed >>> 0);
   const env = plan.env || {};
   const seasonObj = SEASONS[env.season] || SEASONS.autumn;
@@ -264,11 +267,21 @@ export function initSim(plan, seed) {
     pkProfile: plan.pkProfile, salvoKey: env.salvoKey || 'single',
     miss: { reliability: 0, tracklow: 0, saturation: 0, weather: 0, misclassified: 0 },
     eventFires: {},   // how often each user-defined event fired this run
+    log: [],          // chronological event record, only filled when logging is on
+    logging,
   };
 }
 
 // ---- Advance the simulation by dt real seconds (pure model, no rendering) ----
 // Mutates sim. Returns nothing; the caller reads sim for state to render/report.
+// Append one line to the debrief record. Every entry carries the simulation
+// time, what happened and, where the engine knows it, why it happened.
+function logEvent(sim, t, kind, fields) {
+  if (!sim.logging) return;
+  if (sim.log.length > 4000) return;   // a hard ceiling; a debrief is not a trace
+  sim.log.push({ t: Math.round(t), kind, ...fields });
+}
+
 export function stepSim(sim, dtSec, nowMsForReload) {
   const rng = sim.rng;
   sim.simT += dtSec;
@@ -402,6 +415,12 @@ export function stepSim(sim, dtSec, nowMsForReload) {
     if (finalLeg && stepKm >= distKm) {
       tr.pos = { lat: wp.lat, lng: wp.lng }; tr.done = true; tr.leakCounted = true;
       sim.hits.push({ lat: tr.pos.lat, lng: tr.pos.lng });
+      // Why did it get through? The engine knows, so record it rather than guess.
+      logEvent(sim, tms, 'IMPACT', {
+        track: tr.id, type: tr.type, target: tr.tgtId, decoy: !!tr.isDecoy,
+        reason: !tr.everDetected ? 'never detected'
+          : (tr._shotsAt ? 'engaged ' + tr._shotsAt + 'x and missed' : 'detected but never engaged'),
+      });
       if (!tr.isDecoy) {
         const ts = sim.tgtState[tr.tgtId];
         if (ts) {
@@ -410,7 +429,7 @@ export function stepSim(sim, dtSec, nowMsForReload) {
           // SEAD/DEAD: if this was an AD site, damage the battery and disable at 0
           if (ts._batUid) {
             const bat = sim.bats.find(b => b.uid === ts._batUid);
-            if (bat) { bat.hp -= dpt; bat.hitsTaken += 1; if (bat.hp <= 0 && !bat.disabled) { bat.disabled = true; bat.engage = false; sim.adKilled = (sim.adKilled || 0) + 1; } }
+            if (bat) { bat.hp -= dpt; bat.hitsTaken += 1; if (bat.hp <= 0 && !bat.disabled) { bat.disabled = true; bat.engage = false; sim.adKilled = (sim.adKilled || 0) + 1; logEvent(sim, tms, 'SITE LOST', { unit: bat.uid, unitType: bat.type, by: tr.type }); } }
           }
         }
       }
@@ -518,7 +537,10 @@ export function stepSim(sim, dtSec, nowMsForReload) {
     }
     // global jamming flag (legacy/simple mode) degrades but doesn't fully blind
     tr._detected = detected; tr._nSensors = nSensors;
-    if (detected) { tr.everDetected = true; }
+    if (detected) {
+      if (!tr.everDetected) logEvent(sim, tms, 'DETECT', { track: tr.id, type: tr.type, sensors: nSensors });
+      tr.everDetected = true;
+    }
 
     for (let bi = 0; bi < sim.bats.length; bi++) {
       const b = sim.bats[bi]; if (b.isEW || b.isSensor) continue; // sensors detect only
@@ -557,6 +579,8 @@ export function stepSim(sim, dtSec, nowMsForReload) {
         if (!tr.isDecoy && rng() < mis * 0.5) { sim.miss.misclassified++; continue; }
         const sN = SAL.shots;
         b.ammo -= sN; b.shots += sN; sim.spentM += sN * (b.costM || 0);
+        tr._shotsAt = (tr._shotsAt || 0) + 1;
+        logEvent(sim, tms, 'ENGAGE', { unit: b.uid, unitType: b.type, track: tr.id, type: tr.type, rounds: sN, rangeKm: Math.round(dKm) });
         let near = 0; for (const t2 of sim.tracks) { if (!t2.done && tms >= t2.spawnT && kmBetween(t2.pos, b) <= ringKm) near++; }
         const sat = saturationFactor(near, b.channels || 2);
         const optical = b.def.cat === 'GUN_LASER' || b.type === 'gepard' || b.type === 'mobile' || b.type === 'int_team' || b.type === 'manpads';
@@ -590,6 +614,7 @@ export function stepSim(sim, dtSec, nowMsForReload) {
         if (selfDef) { pk = Math.min(0.97, pk * 1.25); tr._sdEngaged = true; }
         if (rng() < pk) {
           tr.done = true; tr.deadCounted = true; b.kills += 1; if (!tr.isDecoy) sim.killedM += tr.costM || 0;
+          logEvent(sim, tms, 'KILL', { unit: b.uid, unitType: b.type, track: tr.id, type: tr.type, decoy: !!tr.isDecoy, pk: Math.round(pk * 100) });
           sim.intercepts.push({ lat: tr.pos.lat, lng: tr.pos.lng }); break;
         } else {
           if (sat < 0.8) sim.miss.saturation++;

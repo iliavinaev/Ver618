@@ -971,7 +971,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     const plan = buildPlan();
     const seed = (Date.now() & 0x7fffffff) >>> 0;
     setRunSeed(seed);
-    const sim = initSim(plan, seed);
+    const sim = initSim(plan, seed, { log: true });
     sim.lastNow = performance.now();
     simRef.current = sim;
     setLive({ inbound: sim.tracks.length, intercepted: 0, leaked: 0 });
@@ -1138,6 +1138,19 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     setReport({
       aborted: !!aborted, total, killed, leaked, unresolved, decoys, realThreats, realLeaked,
       eventFires: { ...(sim.eventFires || {}) }, eventDefs: (sim.env && sim.env.events) || [],
+      log: (sim.log || []).slice(),
+      leakReasons: (() => {
+        // Deterministic debrief: for every threat that reached its target, the
+        // engine already knows which link in the chain failed. Count them.
+        const r = { undetected: 0, unengaged: 0, missed: 0 };
+        sim.tracks.forEach(t => {
+          if (!t.leakCounted || t.isDecoy) return;
+          if (!t.everDetected) r.undetected++;
+          else if (!t._shotsAt) r.unengaged++;
+          else r.missed++;
+        });
+        return r;
+      })(),
       rate: total ? killed / total : 0,
       protect: 1 - realLeaked / resolvedReal,
       byFam, shots, kills, spendBySys,
@@ -2215,8 +2228,24 @@ function FinalReport({ report, onClose, onExport }) {
             <Big label="DEFENCE SPEND" v={`$${f.spentM.toFixed(1)}M`} c={BLUE} sub={`$${f.perKillM.toFixed(2)}M per kill`} />
             <Big label="COST EXCHANGE" v={`${f.exchange.toFixed(1)} : 1`} c={f.exchange >= 1 ? GREEN : AMBER} sub="threat value killed vs spend" />
           </div>
-          {report.eventDefs && report.eventDefs.length > 0 && (
-            <div className="f-mono" style={{ fontSize: 10, color: '#93a1b0', padding: '8px 10px', border: '1px solid #243d52', borderRadius: 3, marginBottom: 12, lineHeight: 1.6 }}>
+          {report.leakReasons && (report.leakReasons.undetected + report.leakReasons.unengaged + report.leakReasons.missed) > 0 && (
+            <div style={{ marginBottom: 12, border: '1px solid #243d52', borderRadius: 3, padding: '10px 12px' }}>
+              <div className="f-mono" style={{ fontSize: 10, color: RED, letterSpacing: '0.12em', marginBottom: 6 }}>WHY THE LEAKERS GOT THROUGH</div>
+              <div className="f-serif" style={{ fontSize: 12.5, lineHeight: 1.7, color: TEXT }}>
+                {report.leakReasons.undetected > 0 && (
+                  <div><strong style={{ color: RED }}>{report.leakReasons.undetected}</strong> never appeared on any radar. A sensor gap, not a shooter gap: more launchers would not have helped.</div>
+                )}
+                {report.leakReasons.unengaged > 0 && (
+                  <div><strong style={{ color: AMBER }}>{report.leakReasons.unengaged}</strong> were held on radar but nothing ever fired at them. Either no system had them in reach, or the ones that did were on HOLD, out of rounds or destroyed.</div>
+                )}
+                {report.leakReasons.missed > 0 && (
+                  <div><strong style={{ color: AMBER }}>{report.leakReasons.missed}</strong> were engaged and survived. This is a probability shortfall: check saturation, track quality and how many rounds each shot used.</div>
+                )}
+              </div>
+            </div>
+          )}
+          {report.log && report.log.length > 0 && <EventLog log={report.log} />}
+          {report.eventDefs && report.eventDefs.length > 0 && (            <div className="f-mono" style={{ fontSize: 10, color: '#93a1b0', padding: '8px 10px', border: '1px solid #243d52', borderRadius: 3, marginBottom: 12, lineHeight: 1.6 }}>
               <span style={{ color: '#d9a52f' }}>PROBABILISTIC EVENTS</span><br />
               {report.eventDefs.map(ev => (
                 <span key={ev.id} style={{ display: 'block' }}>
@@ -2351,6 +2380,62 @@ const btn = (c) => ({ fontSize: 11, padding: '7px 12px', border: `1px solid ${c}
 const actBtn = (c, dis) => ({ flex: 1, fontSize: 12, padding: '10px', border: `1px solid ${c}`, borderRadius: 3, background: dis ? '#16293c' : 'rgba(47,128,214,0.10)', color: dis ? MUT : '#fff', cursor: dis ? 'not-allowed' : 'pointer', letterSpacing: '0.03em' });
 const miniIn = { width: '100%', fontSize: 10, padding: '4px 3px', background: '#0a1626', border: '1px solid #243d52', color: '#dde3ea', borderRadius: 3 };
 function MiniField({ label, children }) { return <div><div className="f-mono" style={{ fontSize: 8, color: '#5d6b7a', marginBottom: 1 }}>{label}</div>{children}</div>; }
+// Chronological record of the engagement, for debriefing it afterwards. Every
+// line is something the engine actually did, with the reason where it has one.
+function EventLog({ log }) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('ALL');
+  const KINDS = ['ALL', 'DETECT', 'ENGAGE', 'KILL', 'IMPACT', 'SITE LOST'];
+  const COLOUR = { DETECT: '#8fd0c4', ENGAGE: '#56a0e0', KILL: GREEN, IMPACT: RED, 'SITE LOST': '#e0726b' };
+  const rows = filter === 'ALL' ? log : log.filter(e => e.kind === filter);
+  const clock = (t) => {
+    const m = Math.floor(t / 60), s = Math.round(t % 60);
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  };
+  const describe = (e) => {
+    if (e.kind === 'DETECT') return `${e.type} held on radar (${e.sensors} sensor${e.sensors === 1 ? '' : 's'})`;
+    if (e.kind === 'ENGAGE') return `${e.unitType} fired ${e.rounds} at ${e.type} at ${e.rangeKm} km`;
+    if (e.kind === 'KILL') return `${e.unitType} destroyed ${e.type}${e.decoy ? ' (a decoy)' : ''} · shot Pk ${e.pk}%`;
+    if (e.kind === 'IMPACT') return `${e.type} reached ${e.target} · ${e.reason}`;
+    if (e.kind === 'SITE LOST') return `${e.unitType} destroyed by ${e.by}`;
+    return e.kind;
+  };
+  const dl = () => {
+    const head = 'time_s,clock,event,detail\\n';
+    const body = log.map(e => `${e.t},${clock(e.t)},${e.kind},"${describe(e).replace(/"/g, "'")}"`).join('\\n');
+    const url = URL.createObjectURL(new Blob([head + body], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'skywatch-engagement-log.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div style={{ marginBottom: 12, border: '1px solid #243d52', borderRadius: 3 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
+        <button onClick={() => setOpen(o => !o)} className="f-mono" style={{ fontSize: 10, letterSpacing: '0.12em', color: '#d9a52f', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+          {open ? '▾' : '▸'} ENGAGEMENT LOG ({log.length})
+        </button>
+        <span style={{ flex: 1 }} />
+        {open && KINDS.map(k => (
+          <button key={k} onClick={() => setFilter(k)} className="f-mono"
+            style={{ fontSize: 8, padding: '2px 7px', borderRadius: 3, border: `1px solid ${filter === k ? (COLOUR[k] || BLUE) : '#243d52'}`, background: filter === k ? 'rgba(47,128,214,0.14)' : 'transparent', color: filter === k ? '#fff' : MUT, cursor: 'pointer' }}>{k}</button>
+        ))}
+        {open && <button onClick={dl} className="f-mono" style={{ fontSize: 8, padding: '2px 7px', borderRadius: 3, border: '1px solid #34516b', background: 'transparent', color: MUT, cursor: 'pointer' }}>CSV</button>}
+      </div>
+      {open && (
+        <div style={{ maxHeight: 300, overflowY: 'auto', borderTop: '1px solid #16293c' }}>
+          {rows.length === 0 && <div className="f-mono" style={{ fontSize: 10, color: MUT, padding: 12 }}>Nothing of that kind happened in this run.</div>}
+          {rows.map((e, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 12px', borderTop: i ? '1px solid #101f2e' : 'none' }}>
+              <span className="f-mono" style={{ fontSize: 9, color: '#5d6b7a', flexShrink: 0 }}>{clock(e.t)}</span>
+              <span className="f-mono" style={{ fontSize: 9, color: COLOUR[e.kind] || MUT, flexShrink: 0, width: 62 }}>{e.kind}</span>
+              <span className="f-serif" style={{ fontSize: 11.5, color: TEXT }}>{describe(e)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Small inline editor for a user-defined probabilistic event.
 function EventAdder({ onAdd }) {
   const [label, setLabel] = useState('');
