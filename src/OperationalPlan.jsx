@@ -9,6 +9,7 @@ import { NATO_COUNTRIES, THREAT_ORIGINS } from './data/natoCapitals';
 import { AD_LIBRARY } from './data/airDefense';
 import { BATTERY_VARIANTS } from './data/operational';
 import { monteCarloCI, monteCarloBatch, summarizeRuns, initSim, stepSim } from './data/simEngine';
+import { costForType, makePkProfile, serialisePlan } from './data/planFns';
 import {
   ALT_BANDS, FAMILY_ALT, effectiveDetectKm, trackQuality, fatigueFactor,
   saturationFactor, misclassifyProb, weaponReliability, reactionLatencyS,
@@ -112,9 +113,6 @@ const ENGAGE_CLASSES = [
   { key: 'male',      short: 'UAV', col: '#4f9d77', bg: 'rgba(79,157,119,0.16)' },
 ];
 // Illustrative unit costs in $M (public order-of-magnitude, not authoritative)
-const THREAT_COST_M = { geran2: 0.1, geran1: 0.05, geran2_jet: 0.25, decoy: 0.01, emit_decoy: 0.02, kh101: 13, kalibr: 6.5, kh22: 1.0, iskander: 3.0, kinzhal: 10, kab: 0.03, kub_bla: 0.12, lancet: 0.035, molniya: 0.005, orlan10: 0.1, orlan30: 0.15, orion: 5, forpost: 6, altius: 12, sirius: 6 };
-const FAM_COST_M = { ballistic: 3.0, cruise: 6.5, glide: 0.03, owa: 0.1, male: 5, tactical: 0.03, recon: 0.08, indirect: 0.005, unknown: 0.1 };
-function costForType(type, family) { if (THREAT_COST_M[type] != null) return THREAT_COST_M[type]; return FAM_COST_M[family] != null ? FAM_COST_M[family] : 0.1; }
 // Impact-target types: HP = hits absorbed, valueM = illustrative replacement value
 const TGT_TYPES = {
   city:   { code: 'CTY', label: 'City district', valueM: 400, hp: 4 },
@@ -398,6 +396,8 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const [showFinal, setShowFinal] = useState(false);
   const [mc, setMc] = useState(null);
   const [mcProgress, setMcProgress] = useState(0);
+  const mcWorkerRef = useRef(null); // array of workers while a batch is in flight
+  const mcCancelRef = useRef(false);
   const [mcSeed, setMcSeed] = useState(0);
   const [runSeed, setRunSeed] = useState(0);
   const [running, setRunning] = useState(false);
@@ -745,17 +745,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     setPlaceKind('battery');
     setPlaceMode(type);
   }
-  function pkProfile(type) {
-    if (OP_PK[type]) return OP_PK[type];
-    const d = allDefs[type] || {};
-    if (d.isEW) return { ballistic: 0, cruise: 0, owa: 0, glide: 0 };
-    if (d.cat === 'GUN_LASER') return OP_PK.gepard;
-    if (d.cat === 'MANPADS') return { ballistic: 0, cruise: 0.10, owa: 0.50, glide: 0.15 };
-    if (d.cat === 'INTERCEPTOR') return { ballistic: 0, cruise: 0.05, owa: 0.60, glide: 0.10 };
-    if ((d.aeroRangeKm || 0) >= 100) return d.tbmFootprintKm > 0 ? OP_PK.patriot : { ballistic: 0.05, cruise: 0.70, owa: 0.50, glide: 0.50 };
-    if ((d.aeroRangeKm || 0) >= 25) return OP_PK.iris_t;
-    return OP_PK.nasams;
-  }
+  const pkProfile = useMemo(() => makePkProfile(allDefs), [allDefs]);
   function pkFor(batType, family) {
     const fam = (family === 'male' || family === 'tactical' || family === 'recon' || family === 'unknown') ? 'owa' : family;
     const base = (pkProfile(batType) || {})[fam] || 0;
@@ -936,22 +926,97 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     };
   }
 
+  // release the worker when leaving the screen
+  useEffect(() => () => { (mcWorkerRef.current || []).forEach(w => { try { w.terminate(); } catch (e) {} }); mcWorkerRef.current = null; }, []);
+
+  function cancelMC() {
+    mcCancelRef.current = true;
+    (mcWorkerRef.current || []).forEach(w => { try { w.postMessage({ type: 'cancel' }); w.terminate(); } catch (e) {} });
+    mcWorkerRef.current = null;
+    setRunning(false); setMcProgress(0);
+  }
+
   function runMC() {
     if (!batteries.length || !totalTracks || !targets.length) return;
+    // A live playback and a batch fighting over the same machine helps nobody.
+    if (playing) stopAttack();
     setRunning(true); setMc(null); setMcProgress(0);
+    mcCancelRef.current = false;
     const plan = buildPlan();
     const base = (Date.now() & 0x7fffffff) >>> 0;
-    const N = 160;                 // enough for tight CIs, ~coarse-dt runs
-    const CHUNK = 16;              // seeds per animation frame
+    const N = 160;
+
+    // Preferred path: split the batch across as many threads as the machine
+    // will give us. A heavy laydown takes about a third of a second per run, so
+    // one thread would mean a minute of waiting; four make it bearable and the
+    // interface stays fully responsive throughout either way.
+    try {
+      const cores = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+      const workers = [];
+      const acc = [];
+      let finished = 0, doneCount = 0;
+      const perWorker = Math.ceil(N / cores);
+
+      for (let k = 0; k < cores; k++) {
+        const from = k * perWorker;
+        const count = Math.min(perWorker, N - from);
+        if (count <= 0) break;
+        const w = new Worker(new URL('./data/mcWorker.js', import.meta.url), { type: 'module' });
+        const progressOf = new Array(cores).fill(0);
+        w.onmessage = (ev) => {
+          const m = ev.data || {};
+          if (m.type === 'progress') {
+            progressOf[k] = m.done;
+            doneCount = acc.length + m.done;
+            setMcProgress(Math.min(99, Math.round((doneCount / N) * 100)));
+            return;
+          }
+          if (m.type === 'done') {
+            acc.push(...(m.runs || []));
+            finished++;
+            setMcProgress(Math.min(99, Math.round((acc.length / N) * 100)));
+            if (finished === workers.length && !mcCancelRef.current) {
+              setMc(summarizeRuns(acc)); setMcSeed(base);
+              setRunning(false); setMcProgress(0);
+              workers.forEach(x => { try { x.terminate(); } catch (e) {} });
+              mcWorkerRef.current = null;
+            }
+            return;
+          }
+          if (m.type === 'error') {
+            console.error('Monte-Carlo:', m.message);
+            cancelMC();
+          }
+        };
+        w.onerror = () => { cancelMC(); mcWorkerRef.current = null; runMCInline(plan, base, N); };
+        workers.push(w);
+        // each worker owns a distinct slice of the seed sequence, so the
+        // combined batch is exactly the batch a single thread would have run
+        w.postMessage({ type: 'run', plan: serialisePlan(plan), base, n: count, offset: from, raw: true });
+      }
+      if (workers.length) { mcWorkerRef.current = workers; return; }
+    } catch (e) {
+      mcWorkerRef.current = null;
+    }
+    runMCInline(plan, base, N);
+  }
+
+  // Fallback only. Runs one simulation at a time and yields to the browser
+  // between them, so the worst stall is a single run rather than sixteen.
+  function runMCInline(plan, base, N) {
+    setRunning(true); setMcProgress(0);
     const acc = [];
     let done = 0;
     const step = () => {
+      if (mcCancelRef.current) { setRunning(false); setMcProgress(0); return; }
       try {
-        const seeds = [];
-        for (let i = 0; i < CHUNK && done + i < N; i++) seeds.push((base + (done + i) * 2654435761) >>> 0);
-        const batch = monteCarloBatch(plan, seeds);
-        for (const r of batch) acc.push(r);
-        done += seeds.length;
+        const started = performance.now();
+        // keep going only while inside a frame's worth of time
+        while (done < N && performance.now() - started < 12) {
+          const seed = (base + done * 2654435761) >>> 0;
+          acc.push(monteCarloBatch(plan, [seed])[0]);
+          done++;
+        }
         setMcProgress(Math.round((done / N) * 100));
         if (done < N) { setTimeout(step, 0); return; }
         setMc(summarizeRuns(acc)); setMcSeed(base);
@@ -2153,7 +2218,14 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
             {!playing
               ? <button onClick={playAttack} disabled={!batteries.length || !totalTracks || !targets.length} className="f-display" style={actBtn(GREEN, !batteries.length || !totalTracks || !targets.length)}>▶ START SIMULATION</button>
               : <button onClick={stopAttack} className="f-display" style={actBtn(RED, false)}>■ STOP</button>}
-            <button onClick={runMC} disabled={running || !batteries.length || !totalTracks || !targets.length} className="f-display" style={actBtn(BLUE, running || !batteries.length || !totalTracks || !targets.length)}>{running && mcProgress > 0 ? `MONTE-CARLO ${mcProgress}%` : running ? '…' : 'MONTE-CARLO ×160'}</button>
+            {running && mcProgress > 0
+              ? (
+                <div style={{ display: 'flex', gap: 5, alignItems: 'stretch' }}>
+                  <button disabled className="f-display" style={{ ...actBtn(BLUE, true), flex: 1 }}>MONTE-CARLO {mcProgress}%</button>
+                  <button onClick={cancelMC} className="f-mono" style={{ fontSize: 9, padding: '0 12px', borderRadius: 3, border: `1px solid ${RED}`, background: 'transparent', color: '#e09a9a', cursor: 'pointer' }}>STOP</button>
+                </div>
+              )
+              : <button onClick={runMC} disabled={running || !batteries.length || !totalTracks || !targets.length} className="f-display" style={actBtn(BLUE, running || !batteries.length || !totalTracks || !targets.length)}>{running ? '…' : 'MONTE-CARLO ×160'}</button>}
           </div>
           {(!batteries.length || !totalTracks || !targets.length) && (
             <div className="f-mono" style={{ fontSize: 9, color: AMBER, marginBottom: 10, lineHeight: 1.5, padding: '6px 8px', border: '1px solid rgba(217,165,47,0.4)', borderRadius: 3 }}>
