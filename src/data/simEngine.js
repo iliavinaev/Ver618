@@ -175,7 +175,15 @@ export function initSim(plan, seed, opts) {
       const tgt = wTargetFor(r, i);
       if (!tgt) continue;
       let originPt;
-      if (origin) {
+      if (r.launch && typeof r.launch.lat === 'number' && typeof r.launch.lng === 'number') {
+        // The planner placed this launch point deliberately, so it is used as
+        // given and never pulled in. This is how a weapon carried to a release
+        // point is modelled: the transit is not simulated, the flight from the
+        // release point is. It is also the answer to an origin on another
+        // continent, where the true home base would put the whole route across
+        // the theatre for no analytical gain.
+        originPt = { lat: r.launch.lat, lng: r.launch.lng };
+      } else if (origin) {
         // Real adversary launch area (Russia, Belarus, sea boxes, Iran). Spawn
         // from HERE so threats always come from their true direction. We only
         // bound the *very longest* ingress so a far origin (e.g. Iran) still
@@ -194,7 +202,14 @@ export function initSim(plan, seed, opts) {
         const back = destPoint(tgt.lat, tgt.lng, (travel + 180) % 360, Math.max(ingressKm, 400));
         originPt = { lat: back.lat, lng: back.lng };
       }
-      const jitterKm = (rng() - 0.4) * Math.min(120, diagKm * 0.10);
+      // Lateral scatter at the spawn. A named origin covers a whole launch area,
+      // so rounds should not all leave from one pixel. A launch point the planner
+      // placed is a decision, not an area, so it is honoured almost exactly and
+      // only given the small dispersion of a real salvo.
+      const placed = !!(r.launch && typeof r.launch.lat === 'number' && typeof r.launch.lng === 'number');
+      const jitterKm = placed
+        ? (rng() - 0.5) * 4
+        : (rng() - 0.4) * Math.min(120, diagKm * 0.10);
       // ENHANCED: a user-drawn route with per-point altitudes overrides the
       // automatic origin->target routing. The first point is the spawn, the
       // last is the impact; altitudes interpolate along the legs.

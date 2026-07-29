@@ -220,14 +220,14 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
 
   // ---- laydown ----
   const [placeKind, setPlaceKind] = useState('target'); // 'target' | 'battery' | 'route' | 'launch'
-  const [enhanced, setEnhanced] = useState(false);
+  const [extended, setExtended] = useState(false); // EXTENDED = planner places the launch point
   // routes the user draws in ENHANCED mode: each = {id,type,family,points:[{lat,lng,altM}],count,spacingSec,startGH,from}
   const [customRoutes, setCustomRoutes] = useState([]);
   const [activeRouteId, setActiveRouteId] = useState(null);
   const [wpAltM, setWpAltM] = useState(1000); // altitude applied to the next clicked waypoint
   const [launchPoint, setLaunchPoint] = useState(null); // optional custom origin {lat,lng}
   const launchPointRef = useRef(launchPoint); launchPointRef.current = launchPoint;
-  const enhancedRef = useRef(enhanced); enhancedRef.current = enhanced;
+  const extendedRef = useRef(extended); extendedRef.current = extended;
   const activeRouteRef = useRef(activeRouteId); activeRouteRef.current = activeRouteId;
   const wpAltRef = useRef(wpAltM); wpAltRef.current = wpAltM;
   const customRoutesRef = useRef(customRoutes); customRoutesRef.current = customRoutes;
@@ -413,7 +413,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     return THREAT_ORIGINS.filter(o => ids.includes(o.id));
   }, [planWaves]);
   const originsRef = useRef(activeOrigins); originsRef.current = activeOrigins;
-  const routes = useMemo(() => planWaves.map(w => ({ from: w.from, target: w.target || 'all' })), [planWaves]);
+  const routes = useMemo(() => planWaves.map(w => ({ from: w.from, target: w.target || 'all', launch: w.launch, type: w.type })), [planWaves]);
   const routesRef = useRef(routes); routesRef.current = routes;
 
   // ---- map init ----
@@ -447,7 +447,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         return;
       }
       // ENHANCED: place a waypoint with the current altitude into the active route
-      if (enhancedRef.current && placeKindRef.current === 'route') {
+      if (placeKindRef.current === 'route') {
         const rid = activeRouteRef.current;
         if (!rid) return; // need an active route first
         const alt = wpAltRef.current;
@@ -617,10 +617,29 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
         L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', iconSize: [70, 12], iconAnchor: [-6, 6], html: `<div style="font-family:monospace;font-size:8px;color:${col};white-space:nowrap;text-shadow:0 0 3px #000">${idx === 0 ? 'LAUNCH ' : isLast ? 'IMPACT ' : 'WP' + idx + ' '}${km}</div>` }) }).addTo(lg);
       });
     });
-    // custom launch point (optional origin)
+    // launch points. The pending one (being placed now) plus every launch point
+    // already committed to a wave, so a plan with several release points reads
+    // at a glance instead of hiding inside the matrix.
+    const committed = [];
+    (routesRef.current || []).forEach(w => {
+      if (w && w.launch && typeof w.launch.lat === 'number') committed.push(w);
+    });
+    committed.forEach(w => {
+      const lp = w.launch;
+      // axis from the release point to whatever it aims at
+      const dests = w.target === 'all'
+        ? targetsRef.current
+        : targetsRef.current.filter(t => t.id === w.target);
+      dests.forEach(t => {
+        L.polyline([[lp.lat, lp.lng], [t.lat, t.lng]], { color: '#e8bd55', weight: 1, opacity: 0.35, dashArray: '5,7' }).addTo(lg);
+      });
+      L.marker([lp.lat, lp.lng], { icon: L.divIcon({ className: '', iconSize: [58, 15], iconAnchor: [29, 7], html: `<div style="font-family:monospace;font-size:7px;color:#e8bd55;text-align:center;text-shadow:0 0 3px #000"><div style="font-size:12px;line-height:1">⊕</div>${(w.type || 'LAUNCH').toUpperCase()}</div>` }) }).addTo(lg);
+    });
+    // the point currently being placed, if it is not already on a wave
     if (launchPointRef.current) {
       const lp = launchPointRef.current;
-      L.marker([lp.lat, lp.lng], { icon: L.divIcon({ className: '', iconSize: [44, 14], iconAnchor: [22, 7], html: `<div style="font-family:monospace;font-size:8px;color:#e8bd55;text-align:center;text-shadow:0 0 3px #000"><div style="font-size:13px;line-height:1">⊕</div>LAUNCH</div>` }) }).addTo(lg);
+      L.circle([lp.lat, lp.lng], { radius: 12000, color: '#e8bd55', weight: 1, opacity: 0.5, dashArray: '3,4', fill: false }).addTo(lg);
+      L.marker([lp.lat, lp.lng], { icon: L.divIcon({ className: '', iconSize: [58, 15], iconAnchor: [29, 7], html: `<div style="font-family:monospace;font-size:8px;color:#e8bd55;text-align:center;text-shadow:0 0 3px #000"><div style="font-size:13px;line-height:1">⊕</div>LAUNCH</div>` }) }).addTo(lg);
     }
     // impact targets (the points that get hit)
     targetsRef.current.forEach(t => {
@@ -859,6 +878,8 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
     if (!qa.type) return;
     const w = {
       type: qa.type, from: qa.from || 'ru_south', target: qa.target || 'all',
+      // in EXTENDED the placed point belongs to this wave and is used as given
+      ...(extended && launchPoint ? { launch: { lat: launchPoint.lat, lng: launchPoint.lng } } : {}),
       count: cnt, spacingSec: Math.max(2, parseInt(qa.spacingSec) || 30), startGH: Math.max(0, parseFloat(qa.startGH) || 0),
       id: 'w' + Date.now() + '_' + Math.floor(Math.random() * 999),
     };
@@ -2010,33 +2031,48 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               </div>
             )}
             <Section title="ENEMY ATTACK">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8, padding: '5px 7px', border: `1px solid ${enhanced ? '#e8bd55' : '#243d52'}`, borderRadius: 3, background: enhanced ? 'rgba(217,165,47,0.10)' : 'transparent' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8, padding: '5px 7px', border: `1px solid ${extended ? '#e8bd55' : '#243d52'}`, borderRadius: 3, background: extended ? 'rgba(217,165,47,0.10)' : 'transparent' }}>
                 <span className="f-mono" style={{ fontSize: 9, color: MUT }}>MODE</span>
-                <button onClick={() => { setEnhanced(false); if (placeKind === 'route') setPlaceKind('target'); }} className="f-mono" style={{ flex: 1, fontSize: 9, padding: '4px', borderRadius: 3, border: `1px solid ${!enhanced ? BLUE : '#34516b'}`, background: !enhanced ? 'rgba(47,128,214,0.18)' : 'transparent', color: !enhanced ? '#fff' : MUT, cursor: 'pointer' }}>SIMPLE</button>
-                <button onClick={() => { setEnhanced(true); }} className="f-mono" style={{ flex: 1, fontSize: 9, padding: '4px', borderRadius: 3, border: `1px solid ${enhanced ? '#e8bd55' : '#34516b'}`, background: enhanced ? 'rgba(217,165,47,0.2)' : 'transparent', color: enhanced ? '#fff' : MUT, cursor: 'pointer' }}>ENHANCED</button>
+                <button onClick={() => { setExtended(false); if (placeKind === 'launch') setPlaceKind('target'); }} className="f-mono" style={{ flex: 1, fontSize: 9, padding: '4px', borderRadius: 3, border: `1px solid ${!extended ? BLUE : '#34516b'}`, background: !extended ? 'rgba(47,128,214,0.18)' : 'transparent', color: !extended ? '#fff' : MUT, cursor: 'pointer' }}>STANDARD</button>
+                <button onClick={() => { setExtended(true); }} className="f-mono" style={{ flex: 1, fontSize: 9, padding: '4px', borderRadius: 3, border: `1px solid ${extended ? '#e8bd55' : '#34516b'}`, background: extended ? 'rgba(217,165,47,0.2)' : 'transparent', color: extended ? '#fff' : MUT, cursor: 'pointer' }}>EXTENDED</button>
               </div>
-              <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 8, lineHeight: 1.4 }}>
-                {enhanced ? 'ENHANCED: draw each missile route by hand with per-waypoint altitude (below). Full control over flight path and height.' : 'SIMPLE: pick a direction, threat and count. Threats launch automatically from that direction toward your targets.'}
+              <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 8, lineHeight: 1.45 }}>
+                {extended
+                  ? 'EXTENDED: you place the launch point for each wave and it is used exactly as placed. This is how you model a weapon carried to a release point, and how you avoid a route that crosses the whole theatre when the true home base is on another continent.'
+                  : 'STANDARD: pick a threat, a direction and a count. Waves launch from that known area toward your targets, on their real bearing.'}
               </div>
 
-              {!enhanced && (
+              {true && (
                 <div>
                   <div className="f-mono" style={{ fontSize: 9, color: '#56a0e0', margin: '2px 0 4px' }}>ADD A WAVE</div>
                   <select value={qa.type} onChange={e => setQa(q => ({ ...q, type: e.target.value }))} className="f-mono"
                     style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3, marginBottom: 4 }}>
                     {tOpts.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                   </select>
-                  <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 3 }}>DIRECTION OF ATTACK</div>
-                  <select value={qa.from} onChange={e => setQa(q => ({ ...q, from: e.target.value }))} className="f-mono" style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3, marginBottom: 4 }}>
-                    <optgroup label="Russia / Belarus">{THREAT_ORIGINS.filter(o => o.group === 'RU').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
-                    <optgroup label="Sea-launched">{THREAT_ORIGINS.filter(o => o.group === 'SEA').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
-                    <optgroup label="Other">{THREAT_ORIGINS.filter(o => o.group === 'IR').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
-                    {launchPoint && <optgroup label="Custom"><option value="custom_launch">Custom launch point</option></optgroup>}
-                  </select>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
-                    <button onClick={() => { setPlaceKind(placeKind === 'launch' ? 'target' : 'launch'); }} className="f-mono" style={{ fontSize: 8, padding: '3px 7px', borderRadius: 3, border: `1px solid ${placeKind === 'launch' ? '#e8bd55' : '#34516b'}`, background: placeKind === 'launch' ? 'rgba(217,165,47,0.18)' : 'transparent', color: placeKind === 'launch' ? '#fff' : MUT, cursor: 'pointer' }}>{placeKind === 'launch' ? '▶ CLICK MAP FOR LAUNCH POINT' : 'or set custom launch point'}</button>
-                    {launchPoint && <span className="f-mono" style={{ fontSize: 8, color: '#e8bd55' }}>{launchPoint.lat.toFixed(1)},{launchPoint.lng.toFixed(1)} <button onClick={() => { setLaunchPoint(null); if (qa.from === 'custom_launch') setQa(q => ({ ...q, from: 'ru_south' })); }} style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontSize: 9 }}>×</button></span>}
-                  </div>
+                  {!extended ? (
+                    <>
+                      <div className="f-mono" style={{ fontSize: 8, color: MUT, marginBottom: 3 }}>DIRECTION OF ATTACK</div>
+                      <select value={qa.from} onChange={e => setQa(q => ({ ...q, from: e.target.value }))} className="f-mono" style={{ width: '100%', fontSize: 10, padding: '5px 4px', background: '#0a1626', border: '1px solid #243d52', color: TEXT, borderRadius: 3, marginBottom: 5 }}>
+                        <optgroup label="Russia / Belarus">{THREAT_ORIGINS.filter(o => o.group === 'RU').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
+                        <optgroup label="Sea-launched">{THREAT_ORIGINS.filter(o => o.group === 'SEA').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
+                        <optgroup label="Other">{THREAT_ORIGINS.filter(o => o.group === 'IR').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup>
+                      </select>
+                    </>
+                  ) : (
+                    <div style={{ marginBottom: 5, padding: '6px 7px', border: `1px solid ${placeKind === 'launch' ? '#e8bd55' : '#243d52'}`, borderRadius: 3, background: placeKind === 'launch' ? 'rgba(217,165,47,0.08)' : '#0a1626' }}>
+                      <div className="f-mono" style={{ fontSize: 8, color: '#e8bd55', marginBottom: 4 }}>LAUNCH / RELEASE POINT</div>
+                      <button onClick={() => { setPlaceKind(placeKind === 'launch' ? 'target' : 'launch'); }} className="f-mono"
+                        style={{ width: '100%', fontSize: 9, padding: '5px', borderRadius: 3, border: `1px solid ${placeKind === 'launch' ? '#e8bd55' : '#34516b'}`, background: placeKind === 'launch' ? 'rgba(217,165,47,0.2)' : 'transparent', color: placeKind === 'launch' ? '#fff' : '#e8bd55', cursor: 'pointer' }}>
+                        {placeKind === 'launch' ? '▶ CLICK THE MAP TO PLACE IT' : (launchPoint ? 'MOVE LAUNCH POINT' : 'PLACE LAUNCH POINT')}
+                      </button>
+                      <div className="f-mono" style={{ fontSize: 8, color: launchPoint ? GREEN : AMBER, marginTop: 5 }}>
+                        {launchPoint
+                          ? `✓ set at ${launchPoint.lat.toFixed(2)}, ${launchPoint.lng.toFixed(2)}`
+                          : '• a wave added now would fall back to the standard direction'}
+                        {launchPoint && <button onClick={() => setLaunchPoint(null)} style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontSize: 9, marginLeft: 6 }}>clear</button>}
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4 }}>
                     <MiniField label="TARGET"><select value={qa.target} onChange={e => setQa(q => ({ ...q, target: e.target.value }))} className="f-mono" style={miniIn}>
                       <option value="all">ALL (spread)</option>
@@ -2070,8 +2106,8 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               )}
             </Section>
           </div>
-          {enhanced && targets.length > 0 && (
-            <Section title="ENHANCED ROUTES (draw by hand)" defaultOpen={false} badge={customRoutes.length ? customRoutes.length : ""}>
+          {targets.length > 0 && (
+            <Section title="HAND-DRAWN ROUTES (optional)" defaultOpen={false} badge={customRoutes.length ? customRoutes.length : ""}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                 <button onClick={() => setPlaceKind('route')} className="f-mono" style={{ fontSize: 9, padding: '4px 8px', borderRadius: 3, border: `1px solid ${placeKind === 'route' ? '#e8bd55' : '#34516b'}`, background: placeKind === 'route' ? 'rgba(217,165,47,0.2)' : 'transparent', color: placeKind === 'route' ? '#fff' : MUT, cursor: 'pointer' }}>{placeKind === 'route' ? '▶ DRAWING ON MAP' : 'DRAW MODE'}</button>
                 <button onClick={addCustomRoute} className="f-mono" style={{ fontSize: 9, padding: '3px 8px', border: '1px solid #4f9d77', borderRadius: 3, background: 'rgba(79,157,119,0.14)', color: GREEN, cursor: 'pointer' }}>+ NEW ROUTE</button>
@@ -2192,7 +2228,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
               {matrix.map((r) => (
                 <div key={r.id} className="f-mono" style={{ display: 'grid', gridTemplateColumns: '1fr 0.6fr 0.6fr 0.35fr 0.45fr 0.28fr', fontSize: 9, color: TEXT, padding: '3px 6px', borderTop: '1px solid #16293c', alignItems: 'center' }}>
                   <span style={{ color: FAM_COL[r.family] || TEXT }}>{r.type}</span>
-                  <span style={{ color: MUT, fontSize: 8 }}>{originShort(r.from)}</span>
+                  <span style={{ color: r.launch ? '#e8bd55' : MUT, fontSize: 8 }}>{r.launch ? `⊕ ${r.launch.lat.toFixed(1)},${r.launch.lng.toFixed(1)}` : originShort(r.from)}</span>
                   <span style={{ color: AMBER, fontSize: 8 }}>{r.target === 'all' ? 'ALL' : r.target}</span>
                   <span>{r.count}</span><span>{r.startGH}h</span>
                   <button onClick={() => setPlanWaves(p => p.filter(w => w.id !== r.id))} style={{ background: 'none', border: 'none', color: RED, cursor: 'pointer', fontSize: 10 }}>×</button>
