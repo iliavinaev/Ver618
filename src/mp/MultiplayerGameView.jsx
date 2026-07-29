@@ -1,4 +1,4 @@
-// MultiplayerGameView — handles deploy phase + run phase for both sides
+// MultiplayerGameView – handles deploy phase + run phase for both sides
 import React, { useState, useEffect, useMemo } from 'react';
 
 // === SHARED CONSTANTS (match server) ===
@@ -155,7 +155,7 @@ function MPHeader({ state, side, onLeave }) {
         <div className="f-mono text-sm">
           {side === 'blue' && <span style={{ color: 'var(--mil-friend)' }}>{g.blueBudget} pts</span>}
           {side === 'red' && <span style={{ color: 'var(--mil-hostile)' }}>{g.redBudget} pts</span>}
-          {!side && <span style={{ color: 'var(--text-secondary)' }}>—</span>}
+          {!side && <span style={{ color: 'var(--text-secondary)' }}>–</span>}
         </div>
       </div>
       {state.phase === 'running' && side === 'blue' && (
@@ -228,7 +228,7 @@ function BlueDeployView({ mp, state }) {
         <div className="cop-card">
           <div className="cop-card-header">DEPLOY · BLUE</div>
           <div className="f-mono text-[11px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-            Click card > click on map. Click placed asset to remove.
+            Click card &gt; click on map. Click placed asset to remove.
           </div>
           <div className="space-y-1">
             {inventory.map(inv => {
@@ -266,7 +266,7 @@ function BlueDeployView({ mp, state }) {
             borderColor: 'var(--mil-neutral)',
             color: 'var(--text-inverted)',
           }}>
-          DEPLOYMENT COMPLETE > BEGIN MISSION
+          DEPLOYMENT COMPLETE &gt; BEGIN MISSION
         </button>
       </div>
     </div>

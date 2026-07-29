@@ -5,7 +5,6 @@ import { JATEC_LOGO, PM_LOGO, AURELIA_SAT } from './jatecLogo.js';
 import L from 'leaflet';
 import { AD_LIBRARY, AD_CATEGORIES } from './data/airDefense';
 import { OFFENSIVE_LIBRARY, OFFENSIVE_CATEGORIES } from './data/offensiveSystems';
-import * as XLSX from 'xlsx';
 import OperationalPlan from './OperationalPlan.jsx';
 
 // ============================================================================
@@ -87,7 +86,8 @@ function entryFromLibRow(row, side) {
     usable: String(row.available || 'yes').toLowerCase() !== 'no',
   };
 }
-function exportLibraryWorkbook(customDef, customOff) {
+async function exportLibraryWorkbook(customDef, customOff) {
+  const XLSX = await import('xlsx');
   const def = [...AD_LIBRARY, ...(customDef || [])].map(e => libRowFromEntry(e, 'DEFENCE'));
   const off = [...OFFENSIVE_LIBRARY, ...(customOff || [])].map(e => libRowFromEntry(e, 'OFFENSIVE'));
   const readme = [
@@ -326,8 +326,8 @@ const BN_BOUNDARIES = [
 const CAPITAL_NODES = [
   // Critical civilian infrastructure of the capital (AURELIA), all aerial-targetable
   { id: 'gov',     x: 360, y: 270, name: 'GOV QUARTER',   hp: 4, maxHp: 4, value: 4, glyph: '⬡', sym: 'GOV',  kind: 'rear' },
-  { id: 'chp',     x: 300, y: 160, name: 'CHP-5',   hp: 3, maxHp: 3, value: 4, glyph: '⚡', sym: 'CHP',  kind: 'rear' },
-  { id: 'substn',  x: 460, y: 195, name: 'SUBSTATION-N',  hp: 2, maxHp: 2, value: 3, glyph: '⚡', sym: 'PWR',  kind: 'rear' },
+  { id: 'chp',     x: 300, y: 160, name: 'CHP-5',   hp: 3, maxHp: 3, value: 4, glyph: 'E', sym: 'CHP',  kind: 'rear' },
+  { id: 'substn',  x: 460, y: 195, name: 'SUBSTATION-N',  hp: 2, maxHp: 2, value: 3, glyph: 'E', sym: 'PWR',  kind: 'rear' },
   { id: 'water',   x: 270, y: 385, name: 'WATER PLANT',   hp: 2, maxHp: 2, value: 3, glyph: '◌', sym: 'H2O',  kind: 'rear' },
   { id: 'hosp',    x: 420, y: 350, name: 'CENTRAL HOSP',  hp: 2, maxHp: 2, value: 2, glyph: '✚', sym: 'MED',  kind: 'rear' },
   { id: 'telecom', x: 480, y: 290, name: 'TELECOM HUB',   hp: 2, maxHp: 2, value: 2, glyph: '◉', sym: 'COM',  kind: 'rear' },
@@ -598,7 +598,7 @@ const DRONE_LOADOUTS = {
     fuelMin: 18,
     pkMod: { owa: 1.05, recon: 1.05, tactical: 0.8, cruise: 0.5, male: 0.6 },
     color: '#2f80d6',
-    icon: '✦',
+    icon: '\u25aa',
   },
   kamikaze_quad: {
     name: 'Kamikaze Quad (COTS mass)',
@@ -2897,7 +2897,7 @@ function AppInner() {
   return (
     <div className="min-h-screen w-full" style={{ background: '#102234', color: '#dde3ea' }}>
       <RisoStyles />
-      {view === 'menu' && <MenuScreen onDemo={startDemo} onTraining={goTraining} onModelling={() => setView('modelling')} onLibrary={() => setView('library')} onMethodology={() => setView('methodology')} audioOn={audioOn} setAudioOn={setAudioOn} />}
+      {view === 'menu' && <MenuScreen onModelling={() => setView('modelling')} onLibrary={() => setView('library')} onMethodology={() => setView('methodology')} audioOn={audioOn} setAudioOn={setAudioOn} />}
       {view === 'methodology' && <MethodologyScreen onBack={() => setView('menu')} />}
       {view === 'library' && <LibraryScreen onBack={() => setView('menu')} />}
       {view === 'trainmenu' && <TrainingHubScreen onSingle={start} onMultiplayer={() => setView('mp_lobby')} onInstructor={startInstructor} onBack={() => setView('menu')} />}
@@ -3353,7 +3353,7 @@ function EntryScreen({ callsign, setCallsign, roomCode, setRoomCode, onCreate, o
           <p className="f-mono text-[10px] mb-3" style={{ color: 'var(--text-secondary)' }}>
             Generate 4-digit room code, share with opponent.
           </p>
-          <button onClick={onCreate} className="btn-riso w-full">CREATE ROOM ></button>
+          <button onClick={onCreate} className="btn-riso w-full">CREATE ROOM &gt;</button>
         </div>
         <div className="cop-card">
           <div className="cop-card-header" style={{ color: 'var(--mil-unknown)' }}>JOIN EXISTING</div>
@@ -3362,7 +3362,7 @@ function EntryScreen({ callsign, setCallsign, roomCode, setRoomCode, onCreate, o
             style={{ letterSpacing: '0.5em', padding: '10px' }} />
           <button onClick={onJoin} className="btn-riso w-full"
             style={{ borderColor: 'var(--mil-unknown)', color: 'var(--mil-unknown)', background: 'rgba(217,165,47,0.1)' }}>
-            JOIN ROOM >
+            JOIN ROOM &gt;
           </button>
         </div>
         <button onClick={onBack} className="btn-riso btn-alt w-full">‹ BACK</button>
@@ -3413,7 +3413,7 @@ function LobbyView({ mp, roomCode, onBack }) {
             <button onClick={() => mp.actions.startMatch()} className="btn-riso flex-1"
               style={canStartMatch(mp.state) ? {
                 background: 'var(--mil-neutral)', borderColor: 'var(--mil-neutral)', color: 'var(--text-inverted)'
-              } : undefined}>START MATCH ></button>
+              } : undefined}>START MATCH &gt;</button>
             <button onClick={onBack} className="btn-riso btn-alt">LEAVE</button>
           </div>
         )}
@@ -3707,7 +3707,56 @@ d  = ½ · f · V · t²                (lateral deflection)`}</Formula>
   );
 }
 
-function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, onMethodology, audioOn, setAudioOn }) {
+// A row in the landing index, set like a contents line in a staff paper: a
+// reference mark, the plain name of the thing, a dotted leader, and the action.
+// The primary row is the one the reader is here for and carries the weight.
+function IndexRow({ mark, label, note, action, primary = false, onClick }) {
+  const [hot, setHot] = React.useState(false);
+  const accent = primary ? '#d9a52f' : '#5aa0e6';
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHot(true)}
+      onMouseLeave={() => setHot(false)}
+      onFocus={() => setHot(true)}
+      onBlur={() => setHot(false)}
+      style={{
+        display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+        background: hot ? 'rgba(47,128,214,0.05)' : 'transparent',
+        border: 'none', borderBottom: '1px solid #1b2f42',
+        padding: primary ? '18px 4px 16px' : '13px 4px 12px',
+        transition: 'background 120ms',
+      }}>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+        <span className="f-mono" style={{ fontSize: 10, color: hot ? accent : '#41607d', letterSpacing: '0.12em', flexShrink: 0, width: 20 }}>{mark}</span>
+        <span className="f-display" style={{ fontSize: primary ? 27 : 18, lineHeight: 1.1, letterSpacing: '0.01em', color: hot ? accent : '#dde3ea', flexShrink: 0 }}>{label}</span>
+        <span aria-hidden="true" style={{ flex: 1, minWidth: 18, alignSelf: 'center', borderBottom: '1px dotted #2b475f', transform: 'translateY(-3px)' }} />
+        <span className="f-mono" style={{ fontSize: 10, letterSpacing: '0.2em', color: hot ? accent : '#5d6b7a', flexShrink: 0 }}>{action}</span>
+      </span>
+      <span className="f-serif" style={{ display: 'block', fontSize: 12.5, lineHeight: 1.55, color: '#7f93a6', marginTop: 5, marginLeft: 34, maxWidth: '62ch' }}>{note}</span>
+    </button>
+  );
+}
+
+// NATO date-time group, e.g. 291430ZJUL26. The one live element on the page,
+// and exactly how a working air picture stamps itself.
+function useDtg() {
+  const fmt = () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const M = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getUTCMonth()];
+    return `${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}Z${M}${String(d.getUTCFullYear()).slice(2)}`;
+  };
+  const [dtg, setDtg] = React.useState(fmt);
+  React.useEffect(() => {
+    const t = setInterval(() => setDtg(fmt()), 15000);
+    return () => clearInterval(t);
+  }, []);
+  return dtg;
+}
+
+function MenuScreen({ onModelling, onLibrary, onMethodology, audioOn, setAudioOn }) {
+  const dtg = useDtg();
   const [info, setInfo] = React.useState(null); // 'prov' | 'facil' | null
   return (
     <div className="min-h-screen riso-paper p-6">
@@ -3733,39 +3782,43 @@ function MenuScreen({ onDemo, onTraining, onModelling, onLibrary, onMethodology,
           </div>
         </div>
 
-        {/* Hero */}
-        <div className="f-mono text-[10px] tracking-[0.25em] mb-2" style={{ color: '#5d6b7a' }}>AIR DEFENCE MODELLING / OPEN-SOURCE / ILLUSTRATIVE</div>
-        <h1 className="f-display" style={{ fontSize: '46px', lineHeight: 1, letterSpacing: '0.06em', color: '#2f80d6' }}>SKYWATCH</h1>
-        <div className="f-mono text-[12px] mt-1" style={{ color: '#93a1b0', letterSpacing: '0.06em' }}>AIR DEFENCE MODELLING &amp; SCENARIO SIMULATOR</div>
-        <div className="f-mono text-[12px] mt-3 mb-1 max-w-2xl" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
-          A standalone tool for modelling air-defence engagements. Lay down defence systems, compose attack waves, run a deterministic simulation, and study the outcomes. All figures are illustrative and derived entirely from open sources.
+        {/* Masthead: a staff-document header, not a product hero. The serial and
+            the live date-time group are how this world stamps a working paper. */}
+        <div className="f-mono" style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', fontSize: 10, letterSpacing: '0.18em', color: '#5d6b7a', marginBottom: 10 }}>
+          <span>SKYWATCH / OA TOOL</span>
+          <span style={{ color: '#34516b' }}>|</span>
+          <span>SERIAL 001</span>
+          <span style={{ color: '#34516b' }}>|</span>
+          <span style={{ color: '#d9a52f' }}>{dtg}</span>
         </div>
-        <div className="double-rule mt-4 mb-6" />
+        <h1 className="f-display" style={{ fontSize: 'clamp(38px, 9vw, 58px)', lineHeight: 0.92, letterSpacing: '0.02em', color: '#dde3ea', margin: 0 }}>
+          AIR DEFENCE<br />
+          <span style={{ color: '#2f80d6' }}>MODELLING</span> &amp; <span style={{ color: '#2f80d6' }}>SCENARIO</span><br />
+          SIMULATOR
+        </h1>
+        <p className="f-serif" style={{ fontSize: 14, lineHeight: 1.65, color: '#93a1b0', maxWidth: '54ch', marginTop: 18 }}>
+          Place the systems that defend a city, compose the raid that comes at it, and run the
+          engagement to see what gets through. The engine is deterministic and the arithmetic is
+          published, so two laydowns can be compared honestly. Every figure is open-source and
+          illustrative, not validated operational analysis.
+        </p>
 
-        <button onClick={onModelling}
-          className="text-left p-5 border-2 transition-colors w-full"
-          style={{ borderColor: '#d9a52f', background: 'rgba(217,165,47,0.06)' }}>
-          <div className="f-display text-2xl mb-1" style={{ color: '#d9a52f' }}>OPEN THE MODELLING TOOL ></div>
-          <div className="f-mono text-[12px]" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
-            Lay down defences, compose the attack, and run the simulation. Author custom threats, edit system parameters for the session, and save, load or export your scenarios and libraries. Illustrative and open-source.
-          </div>
-        </button>
-        <button onClick={onLibrary}
-          className="text-left p-5 border-2 transition-colors mt-4 w-full"
-          style={{ borderColor: '#5aa0e6', background: 'rgba(47,128,214,0.06)' }}>
-          <div className="f-display text-2xl mb-1" style={{ color: '#5aa0e6' }}>SYSTEMS LIBRARY ></div>
-          <div className="f-mono text-[12px]" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
-            Reference catalogue, two sides. DEFENCE: NATO and partner air defence (SAM, MANPADS, guns &amp; lasers, interceptor drones, EW). OFFENSIVE: threats (ballistic, cruise, glide bombs, OWA / loitering, recon, UCAV). Open-source characteristics plus the calibrated in-model profile. Edit parameters for the session or import your own libraries.
-          </div>
-        </button>
-        <button onClick={onMethodology}
-          className="text-left p-5 border-2 transition-colors mt-4 w-full"
-          style={{ borderColor: '#4f9d77', background: 'rgba(79,157,119,0.06)' }}>
-          <div className="f-display text-2xl mb-1" style={{ color: '#4f9d77' }}>METHODOLOGY &amp; INSTRUCTIONS &gt;</div>
-          <div className="f-mono text-[12px]" style={{ color: '#93a1b0', lineHeight: 1.5 }}>
-            How to drive the tool, and exactly what the engine computes: radar horizon, track quality, the kill-probability chain, salvo and saturation, kinematics, command delay, Monte-Carlo confidence and cost exchange. Every formula shown is the one used in the code, with an honest statement of limits.
-          </div>
-        </button>
+        <div style={{ height: 1, background: '#243d52', margin: '26px 0 4px' }} />
+
+        {/* Index of the tool's parts, set as a document contents list with leaders.
+            The primary entry carries the weight; the reference entries stay quiet. */}
+        <IndexRow
+          mark="01" label="Modelling tool" action="OPEN" primary onClick={onModelling}
+          note="Lay down defences, compose the attack, run the simulation, read the report." />
+        <IndexRow
+          mark="02" label="Systems library" action="BROWSE" onClick={onLibrary}
+          note="260 defence and threat systems with open-source characteristics. Edit, import or export as a workbook." />
+        <IndexRow
+          mark="03" label="Methodology & instructions" action="READ" onClick={onMethodology}
+          note="How to drive the tool, every formula the engine uses, and an honest statement of limits." />
+
+        <div style={{ height: 1, background: '#243d52', margin: '4px 0 22px' }} />
+
         <div className="flex items-center gap-3 mt-4 flex-wrap">
           <button onClick={() => setAudioOn(!audioOn)}
             className="btn-riso btn-alt"
@@ -3990,7 +4043,8 @@ function LibraryScreen({ onBack }) {
     ev.target.value = '';
     if (!f) return;
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
+      const XLSX = await import('xlsx');
       let wb;
       try { wb = XLSX.read(new Uint8Array(r.result), { type: 'array' }); }
       catch (err) { window.alert('Import failed: this does not look like a readable workbook.'); return; }
@@ -4454,17 +4508,17 @@ function TrainingHubScreen({ onSingle, onMultiplayer, onInstructor, onBack }) {
         <div className="grid grid-cols-1 gap-3 mb-6">
           <button onClick={onSingle} className="text-left p-4 border-2"
             style={{ borderColor: '#2f80d6', background: 'rgba(47,128,214,0.06)' }}>
-            <div className="f-display text-xl" style={{ color: '#2f80d6' }}>SINGLE PLAYER ></div>
+            <div className="f-display text-xl" style={{ color: '#2f80d6' }}>SINGLE PLAYER &gt;</div>
             <div className="f-mono text-[12px]" style={{ color: '#93a1b0' }}>One commander, one brigade AOR. Iron Wind (48h) · Cold Strike (8h surprise) · Active Combat (24h high-tempo).</div>
           </button>
           <button onClick={onMultiplayer} className="text-left p-4 border-2"
             style={{ borderColor: '#d24a44', background: 'rgba(210,74,68,0.06)' }}>
-            <div className="f-display text-xl" style={{ color: '#d24a44' }}>⚡ MULTIPLAYER (BETA) ></div>
+            <div className="f-display text-xl" style={{ color: '#d24a44' }}>MULTIPLAYER (BETA) &gt;</div>
             <div className="f-mono text-[12px]" style={{ color: '#93a1b0' }}>Multiple leaders share the air picture and split sectors / authority under one attack.</div>
           </button>
           <button onClick={onInstructor} className="text-left p-4 border-2"
             style={{ borderColor: '#b8893a', background: 'rgba(184,137,58,0.06)' }}>
-            <div className="f-display text-xl" style={{ color: '#b8893a' }}>INSTRUCTOR MODE ></div>
+            <div className="f-display text-xl" style={{ color: '#b8893a' }}>INSTRUCTOR MODE &gt;</div>
             <div className="f-mono text-[12px]" style={{ color: '#93a1b0' }}>Run an evaluated serial: pause, inject threats, damage assets, and annotate leader decisions for the AAR.</div>
           </button>
         </div>
@@ -4521,7 +4575,7 @@ function ScenarioScreen({ gameMode, onChoose, onLaunchSaved, onBack }) {
                   <div>{sc.coldStart && <span style={{ color: '#d24a44', fontWeight: 'bold' }}>⚠ COLD START</span>}{sc.coldStart && sc.enemyEW && ' · '}{sc.enemyEW && <span style={{ color: '#d24a44', fontWeight: 'bold' }}>⚠ ENEMY EW</span>}</div>
                 </div>
                 <button className="btn-riso mt-3 w-full" style={{ padding: '8px', fontSize: '13px' }}>
-                  SELECT >
+                  SELECT &gt;
                 </button>
               </div>
             );
@@ -4543,7 +4597,7 @@ function ScenarioScreen({ gameMode, onChoose, onLaunchSaved, onBack }) {
                       <div className="f-display text-base" style={{ color: '#2f80d6' }}>{entry.name || cfg.name || 'Untitled'}</div>
                       <div className="f-mono text-[10px] mt-1" style={{ color: '#5d6b7a' }}>{(cfg.map === 'capital' ? 'CAPITAL' : 'BRIGADE')} · {waves.length} waves · {tracks} tracks · {(+cfg.totalGH)||0}h{cfg.coldStart ? ' · COLD START' : ''}{cfg.enemyEW ? ' · ENEMY EW' : ''}</div>
                     </div>
-                    <button onClick={() => onLaunchSaved && onLaunchSaved(entry)} className="btn-riso" style={{ padding: '8px 14px', fontSize: '13px', flex: 'none' }}>LAUNCH ></button>
+                    <button onClick={() => onLaunchSaved && onLaunchSaved(entry)} className="btn-riso" style={{ padding: '8px 14px', fontSize: '13px', flex: 'none' }}>LAUNCH &gt;</button>
                   </div>
                 );
               })}
@@ -4693,7 +4747,7 @@ function BriefScreen({ onContinue, onBack }) {
           <SubSection title="a. Command">
             <div className="f-serif text-[13px] leading-relaxed">
               <strong>Bde Cdr:</strong> @ BDE MAIN (rear). <strong>AD Cdr (you):</strong> @ BDE TAC.
-              <strong> Succession:</strong> AD Cdr > SAM Cell Chief > SHORAD Cell Chief.
+              <strong> Succession:</strong> AD Cdr &gt; SAM Cell Chief &gt; SHORAD Cell Chief.
               <strong> Attached fires:</strong> CORPS PATRIOT, DIV IRIS-T, coordinate via Air Operations Cell, no direct bde control.
             </div>
           </SubSection>
@@ -4726,7 +4780,7 @@ function BriefScreen({ onContinue, onBack }) {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onContinue} className="btn-riso">ACKNOWLEDGE BRIEF, PROCEED TO DEPLOYMENT ></button>
+          <button onClick={onContinue} className="btn-riso">ACKNOWLEDGE BRIEF, PROCEED TO DEPLOYMENT &gt;</button>
           <button onClick={onBack} className="btn-riso btn-alt">‹ BACK</button>
         </div>
       </div>
@@ -4851,7 +4905,7 @@ function DeployScreen({ placedRef, selectedCardRef, hoveredCardRef, onBegin, onB
               title="Auto-deploy all assets per NATO IAMD layering doctrine">
               ◇ DOCTRINAL LAYDOWN
             </button>
-            <button onClick={onBegin} disabled={!allReq} className="btn-riso mt-2 ml-2">DEPLOY & BEGIN ></button>
+            <button onClick={onBegin} disabled={!allReq} className="btn-riso mt-2 ml-2">DEPLOY & BEGIN &gt;</button>
             <button onClick={onBack} className="btn-riso btn-alt ml-2 mt-2">‹ BACK</button>
           </div>
         </div>
@@ -4929,7 +4983,7 @@ function DeployScreen({ placedRef, selectedCardRef, hoveredCardRef, onBegin, onB
                     return (
                       <div key={n.id} style={{ borderLeft: '3px solid ' + st.c, background: '#16293c', padding: '5px 8px', borderRadius: '2px' }}>
                         <div className="flex items-center justify-between">
-                          <span className="f-mono text-[11px]" style={{ color: '#eef2f6' }}>{'★'.repeat(n.value || 1)} {n.name}</span>
+                          <span className="f-mono text-[11px]" style={{ color: '#eef2f6' }}>{'\u25aa'.repeat(n.value || 1)} {n.name}</span>
                           <span className="f-mono text-[10px]" style={{ color: st.c, fontWeight: 'bold' }}>{st.t}{cnt > 0 ? ' ·' + cnt : ''}</span>
                         </div>
                         <div className="mt-1 f-mono">{Badge('OWA', 'owa')}{Badge('CRU', 'cruise')}{Badge('BAL', 'ballistic')}{Badge('GLD', 'glide')}{Badge('TAC', 'tactical')}{Badge('REC', 'recon')}</div>
@@ -5529,7 +5583,7 @@ function RunScreen({ g, selectedAssetId, setSelectedAssetId, relocatingAsset, se
                 className="f-display text-[12px] px-3 h-9 border-2 flex items-center gap-1"
                 style={{ background: '#3c6e3c', color: '#eafaea', borderColor: '#2f80d6', letterSpacing: '0.04em', borderRadius: '4px' }}
                 title="All assets to ENGAGE, weapons free. You can still widen target classes per asset afterwards.">
-                ⚡ AUTO-ENGAGE
+                AUTO-ENGAGE
               </button>
               {gameMode === 'demo' && (
                 <button
@@ -6086,7 +6140,7 @@ function AssetVis({ a, onClick }) {
       {a.mode === 'ENGAGE' && !a.deploying && (
         <circle cx={a.x} cy={a.y} r="22" fill="none" stroke="#2f80d6" strokeWidth="0.8" className="pulse-emit" />
       )}
-      {a.mode === 'REPAIR' && <text x={a.x + 22} y={a.y - 6} fontSize="9" fill="#d4995a">⚒</text>}
+      {a.mode === 'REPAIR' && <text x={a.x + 22} y={a.y - 6} fontSize="9" fill="#d4995a">R</text>}
       {a.compromisedAt && <text x={a.x - 22} y={a.y - 6} fontSize="9" fill="#d24a44">⚠</text>}
     </g>
   );
@@ -6245,23 +6299,23 @@ function AssetMenu({ asset, pos, onSetMode, onRepair, onRelocate, onSetFacing, o
         <div className="text-[10px] f-mono mb-1" style={{ color: '#5d6b7a' }}>ACTIONS</div>
         <button onClick={() => { onRepair(asset.id); onClose(); }}
           disabled={cantCommand || asset.hp >= asset.maxHp}>
-          🔧 Hide & Field Repair ({(c.repairTime/1000).toFixed(0)}s real)
+          Hide & field repair ({(c.repairTime/1000).toFixed(0)}s real)
         </button>
         <button onClick={() => { onRelocate(asset.id); onClose(); }}
           disabled={cantCommand}>
-          📍 Relocate
+          Relocate
         </button>
         <button onClick={() => { onSetMode(asset.id, 'HIDDEN'); onClose(); }}
           disabled={cantCommand || asset.mode === 'HIDDEN'}>
-          👁 Go Hidden
+          Go hidden
         </button>
         {reloadable && (
           <button onClick={() => { onRequestReload && onRequestReload(asset.id); onClose(); }}
             disabled={!ammoLow}
             style={{ borderColor: ammoLow ? '#2f80d6' : undefined, color: ammoLow ? '#2f80d6' : undefined }}>
             {c.isInterceptor
-              ? `🔄 Reload Drones (${isLocalReload ? 10 : 20} game-min ETA)`
-              : `📦 Request Resupply, ${isLocalReload ? 'local' : 'CORPS'} (${isLocalReload ? 10 : 20} game-min ETA)`}
+              ? `Reload drones (${isLocalReload ? 10 : 20} game-min ETA)`
+              : `Request resupply, ${isLocalReload ? 'local' : 'CORPS'} (${isLocalReload ? 10 : 20} game-min ETA)`}
           </button>
         )}
         {asset.hp === 0 && (
@@ -6344,7 +6398,7 @@ function InstructorPanel({ g, paused, togglePause, onInject, onDamage, notes, on
         <button onClick={() => onInject(injectType, injectFrom)}
           className="btn-riso w-full"
           style={{ background: '#d24a44', borderColor: '#d24a44', padding: '6px', fontSize: '11px' }}>
-          INJECT THREAT >
+          INJECT THREAT &gt;
         </button>
         <div className="border-t border-[#243d52]/30 mt-2 pt-2 grid grid-cols-2 gap-1">
           <button onClick={() => onDamage('random_node')}
@@ -6874,7 +6928,7 @@ function DebriefScreen({ g, instructorNotes, instructorMode, onMenu }) {
 
         <div className="flex gap-2">
           <button onClick={onMenu} className="btn-riso">‹ MENU</button>
-          <button onClick={() => window.print()} className="btn-riso btn-alt">🖨 PRINT AAR</button>
+          <button onClick={() => window.print()} className="btn-riso btn-alt">PRINT AAR</button>
         </div>
       </div>
       <div className="cls-banner mt-8">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>

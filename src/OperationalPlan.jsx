@@ -288,7 +288,6 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   const [playing, setPlaying] = useState(false);
   const playingRef = useRef(false); playingRef.current = playing;
   const [selBat, setSelBat] = useState(null); // uid of battery whose control panel is open
-  const [libCat, setLibCat] = useState('SAM'); // which library category is shown in the AD picker
   const [gunLibCat, setGunLibCat] = useState('MVG'); // fire-groups library tab
   const [patrolFor, setPatrolFor] = useState(null); // uid of fighter whose patrol is being drawn
   const patrolForRef = useRef(patrolFor); patrolForRef.current = patrolFor;

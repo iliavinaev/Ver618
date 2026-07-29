@@ -2475,7 +2475,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Bukovel-AD",
-  "name": "Ukraine",
+  "name": "Bukovel-AD",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2510,7 +2510,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Pokrova",
-  "name": "Ukraine",
+  "name": "Pokrova",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2545,7 +2545,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Atlas",
-  "name": "Ukraine",
+  "name": "Atlas",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2580,7 +2580,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Nota",
-  "name": "Ukraine",
+  "name": "Nota",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2615,7 +2615,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Kvertus AD MW",
-  "name": "Ukraine",
+  "name": "Kvertus AD MW",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2650,7 +2650,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Kvertus AD G-6+ / AD Counter FPV",
-  "name": "Ukraine",
+  "name": "Kvertus AD G-6+ / AD Counter FPV",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2685,7 +2685,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Lima / Enclave (Anklav) / Khmara",
-  "name": "Ukraine",
+  "name": "Lima / Enclave (Anklav) / Khmara",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2720,7 +2720,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Trench EW: Dandelion, PARASOL, VEPR, Shatro, Eter",
-  "name": "Ukraine",
+  "name": "Trench EW: Dandelion, PARASOL, VEPR, Shatro, Eter",
   "country": "UA",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2755,7 +2755,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Leonidas IFPC-HPM Gen I",
-  "name": "USA",
+  "name": "Leonidas IFPC-HPM Gen I",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2790,7 +2790,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Leonidas IFPC-HPM Gen II",
-  "name": "USA",
+  "name": "Leonidas IFPC-HPM Gen II",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2825,7 +2825,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "THOR / Mjolnir",
-  "name": "USA",
+  "name": "THOR / Mjolnir",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2895,7 +2895,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Xpeller",
-  "name": "Germany",
+  "name": "Xpeller",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2930,7 +2930,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Drone Dome",
-  "name": "Israel",
+  "name": "Drone Dome",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -2965,7 +2965,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Sky Shield",
-  "name": "Israel",
+  "name": "Sky Shield",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3000,7 +3000,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "KORAL / KORAL-NG",
-  "name": "Turkey",
+  "name": "KORAL / KORAL-NG",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3035,7 +3035,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "ILGAR",
-  "name": "Turkey",
+  "name": "ILGAR",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3070,7 +3070,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "EJDERHA",
-  "name": "Turkey",
+  "name": "EJDERHA",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3105,7 +3105,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "AN/ALQ-99 -> NGJ",
-  "name": "USA",
+  "name": "AN/ALQ-99 -> NGJ",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3140,7 +3140,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "FS-LIDS / NINJA",
-  "name": "USA",
+  "name": "FS-LIDS / NINJA",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
@@ -3210,7 +3210,7 @@ export const AD_LIBRARY = [
  {
   "cat": "EW",
   "family": "Pulsar",
-  "name": "USA",
+  "name": "Pulsar",
   "country": "NATO/Partners",
   "cls": "EW/SIGINT",
   "rangeKm": null,
