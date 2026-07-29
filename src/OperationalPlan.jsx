@@ -1154,7 +1154,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
   }
   function exportReport() {
     if (!report) return;
-    const data = { tool: 'SKYWATCH OPERATIONAL PLAN', classification: 'PUBLIC // OPEN-SOURCE, ILLUSTRATIVE, NOT VALIDATED OA', when: new Date().toISOString(), matrix: matrix.map(r => ({ type: r.type, family: r.family, from: r.from, count: r.count, startGH: r.startGH, kmh: r.kmh })), report, monteCarlo: mc || null };
+    const data = { tool: 'SKYWATCH OPERATIONAL PLAN', classification: 'PUBLIC · OPEN-SOURCE · ILLUSTRATIVE · NOT VALIDATED OA', when: new Date().toISOString(), matrix: matrix.map(r => ({ type: r.type, family: r.family, from: r.from, count: r.count, startGH: r.startGH, kmh: r.kmh })), report, monteCarlo: mc || null };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `skywatch_operational_report_${Date.now()}.json`; a.click();
   }
@@ -1196,7 +1196,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
       {showScenarios && (
         <div onClick={() => setShowScenarios(false)} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(6,14,24,0.84)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(780px, 96vw)', maxHeight: '90vh', overflowY: 'auto', background: '#0c1c2e', border: '1px solid #34516b', borderRadius: 6 }}>
-            <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+            <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderBottom: '1px solid #243d52' }}>
               <span className="f-display" style={{ fontSize: 18, color: BLUE, letterSpacing: '0.04em' }}>SCENARIO LIBRARY</span>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -1256,7 +1256,7 @@ export default function OperationalPlan({ waves, resolveThreat, threatOptions, o
           </div>
         </div>
       )}
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid #243d52', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span className="f-display" style={{ fontSize: 20, color: BLUE, letterSpacing: '0.04em' }}>OPERATIONAL PLAN</span>
@@ -2197,7 +2197,7 @@ function FinalReport({ report, onClose, onExport }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(6,14,24,0.84)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: 'min(860px, 96vw)', maxHeight: '90vh', overflowY: 'auto', background: '#0c1c2e', border: '1px solid #34516b', borderRadius: 6 }}>
-        <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+        <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderBottom: '1px solid #243d52' }}>
           <div>
             <span className="f-display" style={{ fontSize: 20, color: BLUE, letterSpacing: '0.04em' }}>OPERATIONAL SIMULATION · FINAL REPORT</span>

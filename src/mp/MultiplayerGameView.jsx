@@ -110,7 +110,7 @@ export function MultiplayerGameView({ mp, onLeave }) {
 
   return (
     <div className="min-h-screen riso-paper p-3">
-      <div className="cls-banner mb-2">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mb-2">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <MPHeader state={state} side={side} onLeave={onLeave} />
       {state.phase === 'placing' && side === 'blue' && (
         <BlueDeployView mp={mp} state={state} />
@@ -612,7 +612,7 @@ function EndScreen({ state, onLeave }) {
   return (
     <div className="min-h-screen riso-paper p-6 flex items-center justify-center">
       <div className="max-w-2xl w-full">
-        <div className="cls-banner mb-6">UNCLASSIFIED // POST-MISSION</div>
+        <div className="cls-banner mb-6">UNCLASSIFIED · POST-MISSION</div>
         <div className="cop-card">
           <div className="f-display text-3xl mb-2"
             style={{ color: g.endReason === 'time' ? 'var(--mil-friend)' : 'var(--mil-hostile)' }}>

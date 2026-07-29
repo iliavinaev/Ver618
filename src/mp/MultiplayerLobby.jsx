@@ -20,7 +20,7 @@ export function MultiplayerLobby({ onMatchStart, onBack }) {
     return (
       <div className="min-h-screen riso-paper p-6 flex items-center justify-center">
         <div className="max-w-md w-full">
-          <div className="cls-banner mb-6">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+          <div className="cls-banner mb-6">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
           <div className="text-center mb-6">
             <div className="f-typewriter text-[10px] tracking-[0.4em] mb-2" style={{ color: 'var(--text-secondary)' }}>
               JATEC · MULTIPLAYER
@@ -89,7 +89,7 @@ export function MultiplayerLobby({ onMatchStart, onBack }) {
 
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-3xl mx-auto pt-6">
         <div className="flex items-baseline justify-between mb-3">
           <div>

@@ -154,7 +154,7 @@ export default function OperationalScreen({ onBack }) {
 
   return (
     <div className="min-h-screen riso-paper" style={{ display: 'flex', flexDirection: 'column' }}>
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid #243d52' }}>
         <div>
           <span className="f-display" style={{ fontSize: 22, color: BLUE, letterSpacing: '0.04em' }}>OPERATIONAL THEATRE</span>

@@ -3011,7 +3011,7 @@ function AccessGate({ onOpen }) {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#0a1626', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div className="cls-banner" style={{ position: 'fixed', top: 0, left: 0, right: 0 }}>PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner" style={{ position: 'fixed', top: 0, left: 0, right: 0 }}>PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div style={{ width: 'min(420px, 94vw)', border: '1px solid #243d52', borderRadius: 8, background: '#0c1c2e', padding: '28px 26px' }}>
         <div className="f-mono" style={{ fontSize: 10, letterSpacing: '0.25em', color: '#5d6b7a', marginBottom: 8 }}>ACCESS REQUIRED</div>
         <h1 className="f-display" style={{ fontSize: 40, lineHeight: 1, letterSpacing: '0.06em', color: '#2f80d6', marginBottom: 6 }}>SKYWATCH</h1>
@@ -3334,7 +3334,7 @@ function EntryScreen({ callsign, setCallsign, roomCode, setRoomCode, onCreate, o
   return (
     <div className="min-h-screen riso-paper p-6 flex items-center justify-center">
       <div className="max-w-md w-full">
-        <div className="cls-banner mb-6">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+        <div className="cls-banner mb-6">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
         <div className="text-center mb-6">
           <div className="f-typewriter text-[10px] tracking-[0.2em] mb-2" style={{ color: 'var(--text-secondary)' }}>
             JATEC · MULTIPLAYER
@@ -3375,7 +3375,7 @@ function LobbyView({ mp, roomCode, onBack }) {
   const myPlayer = mp.state?.players?.find(p => p.id === mp.youAre);
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-3xl mx-auto pt-6">
         <div className="flex items-baseline justify-between mb-3">
           <div>
@@ -3539,7 +3539,7 @@ function MethodologyScreen({ onBack }) {
   const TABS = [['how', 'HOW TO USE IT'], ['math', 'THE MATHEMATICS'], ['limits', 'LIMITS & PROVENANCE']];
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-3xl mx-auto pt-4">
         <button onClick={onBack} className="btn-riso btn-alt mb-4" style={{ padding: '6px 14px', fontSize: 12 }}>‹ BACK</button>
         <h1 className="f-display" style={{ fontSize: 34, lineHeight: 1, letterSpacing: '0.05em', color: '#2f80d6' }}>METHODOLOGY</h1>
@@ -3702,7 +3702,7 @@ d  = ½ · f · V · t²                (lateral deflection)`}</Formula>
           </div>
         )}
       </div>
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -3760,7 +3760,7 @@ function MenuScreen({ onModelling, onLibrary, onMethodology, audioOn, setAudioOn
   const [info, setInfo] = React.useState(null); // 'prov' | 'facil' | null
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-4xl mx-auto pt-6 relative">
         {/* Institutional endorsement bar, Project Mercury + NATO-JATEC */}
         <div className="flex items-center justify-between gap-4 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-default)' }}>
@@ -3834,7 +3834,7 @@ function MenuScreen({ onModelling, onLibrary, onMethodology, audioOn, setAudioOn
         </div>
       </div>
       {info && <MenuInfoModal kind={info} onClose={() => setInfo(null)} />}
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -3845,7 +3845,7 @@ function MenuInfoModal({ kind, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(6,14,24,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px, 94vw)', maxHeight: '86vh', overflowY: 'auto', background: '#102234', border: '1px solid #34516b', borderRadius: 6 }}>
-        <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+        <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #243d52' }}>
           <span className="f-display" style={{ fontSize: 18, color: '#2f80d6', letterSpacing: '0.04em' }}>{isProv ? 'DATA & MODEL PROVENANCE' : 'FACILITATOR MODE · PRESENTER SCRIPT'}</span>
           <button onClick={onClose} className="btn-riso btn-alt" style={{ padding: '6px 12px', fontSize: 12 }}>CLOSE</button>
@@ -4087,7 +4087,7 @@ function LibraryScreen({ onBack }) {
 
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-5xl mx-auto pt-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
@@ -4116,7 +4116,7 @@ function LibraryScreen({ onBack }) {
           ? <DefenceLibrary custom={customDef} onDelete={deleteEntry} ttxEdits={ttxEdits} onSaveTtx={saveTtx} onClearTtx={clearTtx} editingKey={editingKey} setEditingKey={setEditingKey} />
           : <OffensiveLibrary custom={customOff} onDelete={deleteEntry} ttxEdits={ttxEdits} onSaveTtx={saveTtx} onClearTtx={clearTtx} editingKey={editingKey} setEditingKey={setEditingKey} />}
       </div>
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       {adding && <AddSystemForm side={side} onAdd={addEntry} onCancel={() => setAdding(false)} />}
     </div>
   );
@@ -4482,7 +4482,7 @@ function AddSystemForm({ side, onAdd, onCancel }) {
 function TrainingHubScreen({ onSingle, onMultiplayer, onInstructor, onBack }) {
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-4xl mx-auto pt-6 relative">
         <div className="flex items-center justify-between gap-4 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-default)' }}>
           <div className="flex items-center gap-4">
@@ -4525,7 +4525,7 @@ function TrainingHubScreen({ onSingle, onMultiplayer, onInstructor, onBack }) {
 
         <button onClick={onBack} className="btn-riso btn-alt">‹ BACK TO MODE SELECT</button>
       </div>
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -4541,9 +4541,9 @@ function ScenarioScreen({ gameMode, onChoose, onLaunchSaved, onBack }) {
   const [savedScn] = React.useState(() => { try { return JSON.parse(localStorage.getItem('sw_scenarios_v1') || '[]'); } catch (e) { return []; } });
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-5xl mx-auto pt-8">
-        <div className="f-typewriter text-xs tracking-[0.25em]" style={{ color: '#5d6b7a' }}>HQ // 4TH MECH DIV // TRAINING DIRECTORATE</div>
+        <div className="f-typewriter text-xs tracking-[0.25em]" style={{ color: '#5d6b7a' }}>HQ · 4TH MECH DIV · TRAINING DIRECTORATE</div>
         <h1 className="f-display mt-2" style={{ fontSize: '32px', lineHeight: 1, letterSpacing: '0.02em', color: '#2f80d6' }}>
           MISSION SELECT
         </h1>
@@ -4607,7 +4607,7 @@ function ScenarioScreen({ gameMode, onChoose, onLaunchSaved, onBack }) {
 
         <button onClick={onBack} className="btn-riso btn-alt mt-6">‹ BACK TO MENU</button>
       </div>
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -4624,7 +4624,7 @@ function BriefScreen({ onContinue, onBack }) {
   const geoStr = SCENARIO.geo ? (((SCENARIO.geo.n + SCENARIO.geo.s) / 2).toFixed(3) + '°N, ' + ((SCENARIO.geo.e + SCENARIO.geo.w) / 2).toFixed(3) + '°E, AO ' + geoKmWidth(SCENARIO.geo).toFixed(0) + ' km wide') : null;
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-4xl mx-auto pt-6">
         {/* OPORD header, NATO standard */}
         <div className="border-2 border-[#243d52] mb-4" style={{ background: '#102234' }}>
@@ -4784,7 +4784,7 @@ function BriefScreen({ onContinue, onBack }) {
           <button onClick={onBack} className="btn-riso btn-alt">‹ BACK</button>
         </div>
       </div>
-      <div className="cls-banner mt-10">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-10">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -4874,7 +4874,7 @@ function DeployScreen({ placedRef, selectedCardRef, hoveredCardRef, onBegin, onB
 
   return (
     <div className="min-h-screen riso-paper p-3">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-[1400px] mx-auto pt-3">
         <div className="flex items-baseline justify-between mb-2">
           <div>
@@ -5098,7 +5098,7 @@ function DeployScreen({ placedRef, selectedCardRef, hoveredCardRef, onBegin, onB
           </div>
         </div>
       </div>
-      <div className="cls-banner mt-3">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-3">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -5684,7 +5684,7 @@ function RunHeader({ g, phase, audioOn, setAudioOn, onEnd, gameMode, onDeployTea
           </span>
         </div>
         <span className="f-typewriter text-[10px] tracking-[0.3em]">
-          PUBLIC // OPEN-SOURCE // ILLUSTRATIVE
+          PUBLIC · OPEN-SOURCE · ILLUSTRATIVE
         </span>
       </div>
 
@@ -6695,7 +6695,7 @@ function DebriefScreen({ g, instructorNotes, instructorMode, onMenu }) {
 
   return (
     <div className="min-h-screen riso-paper p-6">
-      <div className="cls-banner">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       <div className="max-w-4xl mx-auto pt-6">
         <div className="flex items-center gap-3 mb-2">
           <div className="f-typewriter text-xs tracking-widest" style={{ color: '#5d6b7a' }}>AAR</div>
@@ -6931,7 +6931,7 @@ function DebriefScreen({ g, instructorNotes, instructorMode, onMenu }) {
           <button onClick={() => window.print()} className="btn-riso btn-alt">PRINT AAR</button>
         </div>
       </div>
-      <div className="cls-banner mt-8">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+      <div className="cls-banner mt-8">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
     </div>
   );
 }
@@ -7601,7 +7601,7 @@ function ModellingScreen({ onLaunch, onBack }) {
             </div>
           </div>
         </div>
-        <div className="cls-banner mt-8">PUBLIC // OPEN-SOURCE // ILLUSTRATIVE</div>
+        <div className="cls-banner mt-8">PUBLIC · OPEN-SOURCE · ILLUSTRATIVE</div>
       </div>
     </div>
   );
