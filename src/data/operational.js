@@ -86,11 +86,11 @@ export const BATTERY_REAL = {
   // illustrative open-source values, not validated OA.
   //
   // ===== Modern 4th / 5th generation (BVR: AMRAAM / Meteor) =====
-  f15:      { id: 'f15',      name: 'F-15 Eagle / Strike Eagle', tag: 'F-15',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 160, rounds: 8, reloadS: 45, role: 'CAP fighter', costM: 0.8, isFighter: true, speedKmh: 1100, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f15:      { id: 'f15',      name: 'F-15 Eagle / Strike Eagle', tag: 'F-15',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 190, rounds: 8, reloadS: 45, role: 'CAP fighter', costM: 0.8, isFighter: true, speedKmh: 1100, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
   f16:      { id: 'f16',      name: 'F-16 Fighting Falcon',      tag: 'F-16',    nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 1000, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
   fa18:     { id: 'fa18',     name: 'F/A-18 Hornet',             tag: 'F/A-18',  nation: 'NATO', aeroRangeKm: 55, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.6, isFighter: true, speedKmh: 1000, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
   fa18ef:   { id: 'fa18ef',   name: 'F/A-18E/F Super Hornet',    tag: 'F-18EF',  nation: 'NATO', aeroRangeKm: 65, tbmFootprintKm: 0, detectKm: 150, rounds: 8, reloadS: 45, role: 'CAP fighter', costM: 0.8, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
-  f22:      { id: 'f22',      name: 'F-22A Raptor',              tag: 'F-22',    nation: 'NATO', aeroRangeKm: 80, tbmFootprintKm: 0, detectKm: 200, rounds: 6, reloadS: 45, role: 'CAP fighter (VLO)', costM: 1.5, isFighter: true, speedKmh: 1300, mastM: 15000, can: ['cruise','owa','glide','male','recon'] },
+  f22:      { id: 'f22',      name: 'F-22A Raptor',              tag: 'F-22',    nation: 'NATO', aeroRangeKm: 80, tbmFootprintKm: 0, detectKm: 230, rounds: 6, reloadS: 45, role: 'CAP fighter (VLO)', costM: 1.5, isFighter: true, speedKmh: 1300, mastM: 15000, can: ['cruise','owa','glide','male','recon'] },
   f35a:     { id: 'f35a',     name: 'F-35A Lightning II',        tag: 'F-35A',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (VLO)', costM: 1.1, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
   f35b:     { id: 'f35b',     name: 'F-35B Lightning II',        tag: 'F-35B',   nation: 'NATO', aeroRangeKm: 65, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (STOVL)', costM: 1.2, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
   f35c:     { id: 'f35c',     name: 'F-35C Lightning II',        tag: 'F-35C',   nation: 'NATO', aeroRangeKm: 70, tbmFootprintKm: 0, detectKm: 180, rounds: 4, reloadS: 45, role: 'CAP fighter (carrier)', costM: 1.2, isFighter: true, speedKmh: 1000, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
@@ -99,10 +99,13 @@ export const BATTERY_REAL = {
   gripen:   { id: 'gripen',   name: 'Saab JAS 39 Gripen (Meteor)', tag: 'Gripen', nation: 'NATO', aeroRangeKm: 85, tbmFootprintKm: 0, detectKm: 140, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.5, isFighter: true, speedKmh: 1000, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
   mirage2000:{ id: 'mirage2000', name: 'Dassault Mirage 2000',  tag: 'Mirage2k', nation: 'NATO', aeroRangeKm: 45, tbmFootprintKm: 0, detectKm: 100, rounds: 4, reloadS: 45, role: 'CAP fighter', costM: 0.4, isFighter: true, speedKmh: 1100, mastM: 10000, can: ['cruise','owa','glide','male','recon'] },
   mig29:    { id: 'mig29',    name: 'MiG-29 (R-77 / R-27)',      tag: 'MiG-29',  nation: 'NATO', aeroRangeKm: 50, tbmFootprintKm: 0, detectKm: 100, rounds: 6, reloadS: 45, role: 'CAP fighter', costM: 0.3, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
+  f16v:     { id: 'f16v',     name: 'F-16 Block 70/72 (APG-83)', tag: 'F-16V',  nation: 'NATO', aeroRangeKm: 60, tbmFootprintKm: 0, detectKm: 120, rounds: 6, reloadS: 45, role: 'CAP fighter (AESA)', costM: 0.6, isFighter: true, speedKmh: 1000, mastM: 9000, can: ['cruise','owa','glide','male','recon'] },
+  f15ex:    { id: 'f15ex',    name: 'F-15EX Eagle II (APG-82)', tag: 'F-15EX',  nation: 'NATO', aeroRangeKm: 75, tbmFootprintKm: 0, detectKm: 190, rounds: 12, reloadS: 45, role: 'CAP fighter (heavy magazine)', costM: 1.0, isFighter: true, speedKmh: 1100, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  gripene:  { id: 'gripene',  name: 'Saab JAS 39E Gripen (Raven)', tag: 'Gripen E', nation: 'NATO', aeroRangeKm: 90, tbmFootprintKm: 0, detectKm: 150, rounds: 7, reloadS: 45, role: 'CAP fighter (Meteor, AESA)', costM: 0.7, isFighter: true, speedKmh: 1050, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
   fa50:     { id: 'fa50',     name: 'FA-50 Fighting Eagle',      tag: 'FA-50',   nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 80, rounds: 4, reloadS: 45, role: 'light CAP fighter', costM: 0.3, isFighter: true, speedKmh: 900, mastM: 8000, can: ['cruise','owa','glide','male','recon'] },
   // ===== 1960s-1990s (gun + BVR/IR; effective vs cruise but shorter reach) =====
-  f4:       { id: 'f4',       name: 'F-4 Phantom II',            tag: 'F-4',     nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 70, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.2, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','recon'] },
-  f14:      { id: 'f14',      name: 'F-14 Tomcat',               tag: 'F-14',    nation: 'NATO', aeroRangeKm: 60, tbmFootprintKm: 0, detectKm: 130, rounds: 6, reloadS: 60, role: 'legacy interceptor', costM: 0.4, isFighter: true, speedKmh: 1200, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
+  f4:       { id: 'f4',       name: 'F-4 Phantom II',            tag: 'F-4',     nation: 'NATO', aeroRangeKm: 30, tbmFootprintKm: 0, detectKm: 40, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.2, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','recon'] },
+  f14:      { id: 'f14',      name: 'F-14 Tomcat',               tag: 'F-14',    nation: 'NATO', aeroRangeKm: 60, tbmFootprintKm: 0, detectKm: 200, rounds: 6, reloadS: 60, role: 'legacy interceptor', costM: 0.4, isFighter: true, speedKmh: 1200, mastM: 11000, can: ['cruise','owa','glide','male','recon'] },
   f8:       { id: 'f8',       name: 'F-8 Crusader',              tag: 'F-8',     nation: 'NATO', aeroRangeKm: 18, tbmFootprintKm: 0, detectKm: 55, rounds: 4, reloadS: 60, role: 'legacy day fighter', costM: 0.15, isFighter: true, speedKmh: 1000, mastM: 8000, can: ['cruise','owa','recon'] },
   miragef1: { id: 'miragef1', name: 'Mirage F1',                 tag: 'MirageF1', nation: 'NATO', aeroRangeKm: 25, tbmFootprintKm: 0, detectKm: 70, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.15, isFighter: true, speedKmh: 1100, mastM: 9000, can: ['cruise','owa','glide','recon'] },
   tornadoadv:{ id: 'tornadoadv', name: 'Tornado ADV F.3',       tag: 'TornadoF3', nation: 'NATO', aeroRangeKm: 45, tbmFootprintKm: 0, detectKm: 110, rounds: 4, reloadS: 60, role: 'legacy interceptor', costM: 0.25, isFighter: true, speedKmh: 1100, mastM: 10000, can: ['cruise','owa','glide','recon'] },
@@ -117,7 +120,14 @@ export const BATTERY_REAL = {
   lightning:{ id: 'lightning', name: 'English Electric Lightning', tag: 'Lightning', nation: 'NATO', aeroRangeKm: 12, tbmFootprintKm: 0, detectKm: 45, rounds: 2, reloadS: 60, role: 'legacy interceptor', costM: 0.06, isFighter: true, speedKmh: 1200, mastM: 9000, can: ['cruise','owa','recon'] },
   // --- Sensors (detection only, no weapons) ---
   radar_gbad: { id: 'radar_gbad', name: 'Ground radar (GBAD)', tag: 'RADAR', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 150, rounds: 0, reloadS: 0, role: 'sensor', isSensor: true, mastM: 30, costM: 0.1, can: [] },
-  awacs:    { id: 'awacs',    name: 'AWACS (airborne radar)', tag: 'AWACS', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 400, rounds: 0, reloadS: 0, role: 'sensor (airborne)', isSensor: true, isFighter: true, speedKmh: 700, mastM: 10000, costM: 2.0, can: [] },
+  // Airborne early warning. These are the detection backbone and they differ a
+  // great deal, so they are separate systems rather than one generic entry.
+  // detectKm is the quoted air-search range against a fighter-sized target.
+  e3: { id: 'e3', name: 'E-3 Sentry (AWACS)', tag: 'E-3', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 400, rounds: 0, reloadS: 0, role: 'AEW&C (rotodome)', isSensor: true, isFighter: true, speedKmh: 850, mastM: 10700, costM: 2.7, can: [] },
+  e7: { id: 'e7', name: 'E-7 Wedgetail (MESA)', tag: 'E-7', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 370, rounds: 0, reloadS: 0, role: 'AEW&C (AESA, no rotation)', isSensor: true, isFighter: true, speedKmh: 850, mastM: 12500, costM: 4.0, can: [] },
+  globaleye: { id: 'globaleye', name: 'Saab GlobalEye (Erieye ER)', tag: 'GLOBALEYE', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 450, rounds: 0, reloadS: 0, role: 'AEW&C (long-endurance)', isSensor: true, isFighter: true, speedKmh: 800, mastM: 11000, costM: 3.5, can: [] },
+  e2d: { id: 'e2d', name: 'E-2D Advanced Hawkeye', tag: 'E-2D', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 300, rounds: 0, reloadS: 0, role: 'AEW&C (carrier)', isSensor: true, isFighter: true, speedKmh: 620, mastM: 10000, costM: 2.0, can: [] },
+  awacs: { id: 'awacs', name: 'AWACS (generic)', tag: 'AWACS', nation: 'NATO', aeroRangeKm: 0, tbmFootprintKm: 0, detectKm: 400, rounds: 0, reloadS: 0, role: 'sensor (airborne)', isSensor: true, isFighter: true, speedKmh: 700, mastM: 10000, costM: 2.0, can: [] },
 };
 
 // ---- Probability of kill: weapon family x threat family (operational, illustrative) ----
@@ -192,6 +202,13 @@ export const OP_PK = {
   mirage3:     { ballistic: 0.0, cruise: 0.18, owa: 0.34, glide: 0.0,  male: 0.0 },
   draken:      { ballistic: 0.0, cruise: 0.18, owa: 0.34, glide: 0.0,  male: 0.0 },
   lightning:   { ballistic: 0.0, cruise: 0.20, owa: 0.34, glide: 0.0,  male: 0.0 },
+  f16v:         { ballistic: 0.0, cruise: 0.74, owa: 0.65, glide: 0.58, male: 0.67 },
+  f15ex:        { ballistic: 0.0, cruise: 0.78, owa: 0.68, glide: 0.62, male: 0.70 },
+  gripene:      { ballistic: 0.0, cruise: 0.80, owa: 0.70, glide: 0.64, male: 0.72 },
+  e3:           { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
+  e7:           { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
+  globaleye:    { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
+  e2d:          { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
   radar_gbad:  { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
   awacs:       { ballistic: 0.0, cruise: 0.0,  owa: 0.0,  glide: 0.0 },
 };

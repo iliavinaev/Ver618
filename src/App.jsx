@@ -3812,7 +3812,7 @@ function MenuScreen({ onModelling, onLibrary, onMethodology, audioOn, setAudioOn
           note="Lay down defences, compose the attack, run the simulation, read the report." />
         <IndexRow
           mark="02" label="Systems library" action="BROWSE" onClick={onLibrary}
-          note="260 defence and threat systems with open-source characteristics. Edit, import or export as a workbook." />
+          note="278 defence and threat systems with open-source characteristics. Edit, import or export as a workbook." />
         <IndexRow
           mark="03" label="Methodology & instructions" action="READ" onClick={onMethodology}
           note="How to drive the tool, every formula the engine uses, and an honest statement of limits." />
